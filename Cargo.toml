@@ -1,0 +1,14 @@
+[package]
+name = "chillphoto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+futures = "0.3.31"
+image = "0.25.5"
+kamadak-exif = "0.6.1"
+rayon = "1.10.0"
+serde = "1.0.219"
+toml = "0.8.20"
+wax = "0.6.0"
+yew = { version = "0.21.0", features = ["ssr"] }
