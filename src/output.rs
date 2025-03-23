@@ -1,13 +1,14 @@
 use crate::{
     config::{Config, OutputConfig},
-    gallery::{Gallery, Item},
+    gallery::{Gallery, Item, PageFormat},
     photo::Photo,
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{fs, sync::Arc};
 use yew::{
-    function_component, html, AttrValue, Html, LocalServerRenderer, Properties, ServerRenderer,
+    function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer, Properties,
+    ServerRenderer,
 };
 
 impl Gallery {
@@ -66,6 +67,26 @@ impl Gallery {
                     &config.output.category_html::<false>(&path, &category.name),
                 )
             }
+            Item::Page(page) => {
+                let body = match page.format {
+                    PageFormat::PlainText => Html::VText(VText::new(page.content)),
+                    PageFormat::Markdown => Html::from_html_unchecked(
+                        markdown::to_html_with_options(&page.content, &markdown::Options::gfm())
+                            .unwrap()
+                            .into(),
+                    ),
+                    PageFormat::Html => Html::from_html_unchecked(page.content.into()),
+                };
+
+                render_html(
+                    AppProps {
+                        title: page.name.clone().into(),
+                        head: Default::default(),
+                        body,
+                    },
+                    &config.output.page_html::<false>(&path, &page.name),
+                )
+            }
         });
 
         render_html(
@@ -81,14 +102,14 @@ impl Gallery {
 
 fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
     html! {
-        (items.iter().map(|child| {
+        (items.iter().filter_map(|child| {
             match child {
                 Item::Photo(photo) => {
-                    html!{
+                    Some(html!{
                         <a href={config.output.photo_html::<true>(&category_path, &photo.name)}>
                             <img src={config.output.thumbnail::<true>(&category_path, &photo.name)}/>
                         </a>
-                    }
+                    })
                 }
                 Item::Category(category) => {
                     let mut representative = Option::<(String, Photo)>::None;
@@ -101,18 +122,17 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                             return;
                         }
                         if let Item::Photo(photo) = item {
-                            println!("{path:?}");
                             representative = Some((path.join("/"), photo.clone()));
                         }
                     });
                     let (photo_path, photo) = representative.unwrap();
-                    println!("{photo_path}");
-                    html!{
+                    Some(html!{
                         <a href={config.output.category_html::<true>(&category_path, &category.name)}>
                             <img src={config.output.thumbnail::<true>(&photo_path, &photo.name)}/>
                         </a>
-                    }
+                    })
                 }
+                Item::Page(_) => None
             }
         }).collect::<Html>())
     }

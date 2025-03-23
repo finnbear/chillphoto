@@ -78,6 +78,7 @@ pub fn visit_children_items_mut(
 pub enum Item {
     Category(Category),
     Photo(Photo),
+    Page(Page),
 }
 
 impl Item {
@@ -114,4 +115,18 @@ impl Category {
         path.push(self.name.clone());
         visit_children_items(&mut path, &self.children, &mut visitor);
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct Page {
+    pub name: String,
+    pub content: String,
+    pub format: PageFormat,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PageFormat {
+    PlainText,
+    Markdown,
+    Html,
 }

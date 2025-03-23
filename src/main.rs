@@ -2,7 +2,7 @@
 
 use config::{Config, ThumbnailConfig};
 use exif::ExifData;
-use gallery::{Gallery, Item};
+use gallery::{Gallery, Item, Page, PageFormat};
 use image::imageops::{self, resize, FilterType};
 use image::{DynamicImage, GenericImageView, RgbImage};
 use photo::Photo;
@@ -61,6 +61,28 @@ fn main() {
             (Vec::new(), name.as_str())
         };
 
+        let page_format = if name.ends_with(".html") {
+            Some(PageFormat::Html)
+        } else if name.ends_with(".md") {
+            Some(PageFormat::Markdown)
+        } else if name.ends_with(".txt") {
+            Some(PageFormat::PlainText)
+        } else {
+            None
+        };
+
+        if let Some(format) = page_format {
+            let file = std::fs::read_to_string(entry.path()).unwrap();
+            let mut gallery = gallery.lock().unwrap();
+            let mut to_insert = gallery.get_or_create_category(&categories);
+            to_insert.push(Item::Page(Page {
+                name: name.rsplit_once('.').unwrap().0.to_owned(),
+                content: file,
+                format,
+            }));
+            return;
+        }
+
         let file = std::fs::read(entry.path()).unwrap();
         let img = image::load_from_memory(&file)
             .expect("failed to open image")
@@ -82,6 +104,7 @@ fn main() {
     let mut gallery = gallery.into_inner().unwrap();
     let mut categories = 0usize;
     let mut photos = 0usize;
+    let mut pages = 0usize;
     gallery.visit_items_mut(|_, item| match item {
         Item::Category(_) => {
             categories += 1;
@@ -89,11 +112,14 @@ fn main() {
         Item::Photo(_) => {
             photos += 1;
         }
+        Item::Page(_) => {
+            pages += 1;
+        }
     });
 
     //println!("{gallery:?}");
     println!(
-        "({:.1}s) Found {photos} photos in {categories} categories",
+        "({:.1}s) Found {photos} photos in {categories} categories, and {pages} pages",
         start.elapsed().as_secs_f32()
     );
 
