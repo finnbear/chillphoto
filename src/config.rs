@@ -85,6 +85,13 @@ impl OutputConfig {
     }
 
     pub fn category_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
-        format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
+        format!(
+            "{}/index.html",
+            self.variation::<PUBLIC>(category, name, "")
+        )
+    }
+
+    pub fn index_html<const PUBLIC: bool>(&self) -> String {
+        format!("{}.html", self.variation::<PUBLIC>("", "index", ""))
     }
 }

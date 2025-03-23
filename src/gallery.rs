@@ -7,41 +7,11 @@ pub struct Gallery {
 
 impl Gallery {
     pub fn visit_items<'a>(&'a self, mut visitor: impl FnMut(&[String], &'a Item)) {
-        pub fn visit_children_items<'a>(
-            path: &mut Vec<String>,
-            children: &'a [Item],
-            visitor: &mut impl FnMut(&[String], &'a Item),
-        ) {
-            for child in children {
-                visitor(&path, child);
-                if let Some(category) = child.category() {
-                    path.push(category.name.clone());
-                    visit_children_items(path, &category.children, visitor);
-                    path.pop().unwrap();
-                }
-            }
-        }
-
         visit_children_items(&mut Vec::<String>::new(), &self.children, &mut visitor);
     }
 
     pub fn visit_items_mut(&mut self, mut visitor: impl FnMut(&[String], &mut Item)) {
-        pub fn visit_children_items(
-            path: &mut Vec<String>,
-            children: &mut [Item],
-            visitor: &mut impl FnMut(&[String], &mut Item),
-        ) {
-            for child in children {
-                visitor(&path, child);
-                if let Some(category) = child.category_mut() {
-                    path.push(category.name.clone());
-                    visit_children_items(path, &mut category.children, visitor);
-                    path.pop().unwrap();
-                }
-            }
-        }
-
-        visit_children_items(&mut Vec::<String>::new(), &mut self.children, &mut visitor);
+        visit_children_items_mut(&mut Vec::<String>::new(), &mut self.children, &mut visitor);
     }
 
     pub fn get_or_create_category(&mut self, path: &[&str]) -> &mut Vec<Item> {
@@ -74,6 +44,36 @@ impl Gallery {
     }
 }
 
+pub fn visit_children_items<'a>(
+    path: &mut Vec<String>,
+    children: &'a [Item],
+    visitor: &mut impl FnMut(&[String], &'a Item),
+) {
+    for child in children {
+        visitor(&path, child);
+        if let Some(category) = child.category() {
+            path.push(category.name.clone());
+            visit_children_items(path, &category.children, visitor);
+            path.pop().unwrap();
+        }
+    }
+}
+
+pub fn visit_children_items_mut(
+    path: &mut Vec<String>,
+    children: &mut [Item],
+    visitor: &mut impl FnMut(&[String], &mut Item),
+) {
+    for child in children {
+        visitor(&path, child);
+        if let Some(category) = child.category_mut() {
+            path.push(category.name.clone());
+            visit_children_items_mut(path, &mut category.children, visitor);
+            path.pop().unwrap();
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Item {
     Category(Category),
@@ -102,4 +102,16 @@ impl Item {
 pub struct Category {
     pub name: String,
     pub children: Vec<Item>,
+}
+
+impl Category {
+    pub fn visit_items<'a>(
+        &'a self,
+        path: &[String],
+        mut visitor: impl FnMut(&[String], &'a Item),
+    ) {
+        let mut path = path.to_owned();
+        path.push(self.name.clone());
+        visit_children_items(&mut path, &self.children, &mut visitor);
+    }
 }
