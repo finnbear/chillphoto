@@ -21,6 +21,7 @@ mod exif;
 mod gallery;
 mod output;
 mod photo;
+mod util;
 
 fn main() {
     let start = Instant::now();
@@ -41,15 +42,15 @@ fn main() {
     }
     let (root, glob) = Glob::new(&input_path_string).unwrap().partition();
 
-    if fs::exists(&config.output.path).unwrap() {
-        fs::remove_dir_all(&config.output.path).expect("Failed to clear output directory");
-    }
-
     let gallery = Mutex::new(Gallery {
         children: Vec::new(),
     });
 
-    let mut entries = glob.walk(root).not([config.output.path.as_str()]).unwrap().collect::<Vec<_>>();
+    let mut entries = glob
+        .walk(root)
+        .not([config.output.path.as_str()])
+        .unwrap()
+        .collect::<Vec<_>>();
 
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
@@ -91,11 +92,18 @@ fn main() {
     });
 
     //println!("{gallery:?}");
-    println!("({:.1}s) Found {photos} photos in {categories} categories", start.elapsed().as_secs_f32());
+    println!(
+        "({:.1}s) Found {photos} photos in {categories} categories",
+        start.elapsed().as_secs_f32()
+    );
 
     gallery.output(&config);
 
-    println!("({:.1}s) Saved website to {}", start.elapsed().as_secs_f32(), config.output.path);
+    println!(
+        "({:.1}s) Saved website to {}",
+        start.elapsed().as_secs_f32(),
+        config.output.path
+    );
 }
 
 fn is_text_file(path: &Path) -> bool {

@@ -74,7 +74,7 @@ impl Gallery {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Item {
     Category(Category),
     Photo(Photo),
@@ -98,7 +98,7 @@ impl Item {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Category {
     pub name: String,
     pub children: Vec<Item>,

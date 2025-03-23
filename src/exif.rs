@@ -1,7 +1,7 @@
 use exif::{Exif, In, Tag};
 use std::io::Cursor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExifData {
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,

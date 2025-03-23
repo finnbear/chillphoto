@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::path::Path;
 
+use crate::util::add_trailing_slash_if_nonempty;
+
 #[derive(Deserialize)]
 pub struct Config {
     pub input: InputConfig,
@@ -47,23 +49,42 @@ impl OutputConfig {
             .to_owned()
     }
 
-    pub fn variation(&self, category: &str, name: &str, variation: &str) -> String {
+    pub fn variation<const PUBLIC: bool>(
+        &self,
+        category: &str,
+        name: &str,
+        variation: &str,
+    ) -> String {
         let (name, extension) = name
             .rsplit_once('.')
             .map(|(name, extension)| (name, format!(".{extension}")))
             .unwrap_or((name, String::new()));
-        self.subdirectory(&format!("{category}/{name}{variation}{extension}"))
+        let category = add_trailing_slash_if_nonempty(category);
+        let path = format!("{category}{name}{variation}{extension}");
+        if PUBLIC {
+            format!("/{path}")
+        } else {
+            self.subdirectory(&path)
+        }
     }
 
-    pub fn photo(&self, category: &str, name: &str) -> String {
-        self.variation(category, name, "")
+    pub fn photo<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+        self.variation::<PUBLIC>(category, name, "")
     }
 
-    pub fn preview(&self, category: &str, name: &str) -> String {
-        self.variation(category, name, "_preview")
+    pub fn photo_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+        format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
     }
 
-    pub fn thumbnail(&self, category: &str, name: &str) -> String {
-        self.variation(category, name, "_thumbnail")
+    pub fn preview<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+        self.variation::<PUBLIC>(category, name, "_preview")
+    }
+
+    pub fn thumbnail<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+        self.variation::<PUBLIC>(category, name, "_thumbnail")
+    }
+
+    pub fn category_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+        format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
     }
 }
