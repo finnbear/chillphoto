@@ -142,6 +142,15 @@ fn render_html(props: AppProps, path: &str) {
     use std::ops::Deref;
     let renderer = LocalServerRenderer::<App>::with_props(props).hydratable(false);
     let html = futures::executor::block_on(renderer.render());
+
+    let mut options = markup_fmt::config::FormatOptions::default();
+    options.layout.use_tabs = true;
+    options.layout.indent_width = 1;
+    let html = markup_fmt::format_text(&html, markup_fmt::Language::Html, &options, |code, _| {
+        Ok::<_, std::convert::Infallible>(code.into())
+    })
+    .unwrap();
+
     fs::write(path, html).expect(path);
 }
 

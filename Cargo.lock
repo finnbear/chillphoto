@@ -215,6 +215,7 @@ dependencies = [
  "image",
  "kamadak-exif",
  "markdown",
+ "markup_fmt",
  "rayon",
  "serde",
  "toml",
@@ -297,6 +298,12 @@ name = "crunchy"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
+
+[[package]]
+name = "css_dataset"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25670139e591f1c2869eb8d0d977028f8d05e859132b4c874ecd02a00d3c9174"
 
 [[package]]
 name = "either"
@@ -971,6 +978,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1054,6 +1070,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9047e0a37a596d4e15411a1ffbdabe71c328908cb90a721cb9bf8dcf3434e6d2"
 dependencies = [
  "unicode-id",
+]
+
+[[package]]
+name = "markup_fmt"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7d75c5f415bb645c5715a1f5f72319b880133b9c4905b7867120a283bff5b2d"
+dependencies = [
+ "aho-corasick",
+ "css_dataset",
+ "itertools 0.13.0",
+ "memchr",
+ "tiny_pretty",
 ]
 
 [[package]]
@@ -1741,6 +1770,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tiny_pretty"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b3f46f0549180b9c6f7f76270903f1a06867c43a03998b99dce81aa1760c3b2"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "tokio"
 version = "1.44.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1848,6 +1886,12 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
+
+[[package]]
+name = "unicode-width"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "unicode-xid"
