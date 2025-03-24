@@ -237,6 +237,7 @@ pub fn app(props: &AppProps) -> Html {
         r#"
         body {
             background-color: #222222;
+            margin: 2rem;
         }
 
         a {
@@ -246,7 +247,8 @@ pub fn app(props: &AppProps) -> Html {
 
         #page {
             background-color: #fbfbfb;
-            margin: 2rem;
+            max-width: 80rem;
+            margin: 0rem auto;
             display: flex;
             flex-direction: column;
             border-radius: 0.75rem;
