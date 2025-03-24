@@ -42,7 +42,9 @@ impl Gallery {
                     .unwrap();
                 render_html(
                     AppProps {
+                        config: config.clone(),
                         title: photo.name.clone().into(),
+                        description: photo.description.clone().map(|d| d.into()),
                         head: Default::default(),
                         body: html! {
                             <a href={config.output.photo::<true>(&path, &photo.name)}>
@@ -60,7 +62,9 @@ impl Gallery {
                     .expect("faailed to create item directory");
                 render_html(
                     AppProps {
+                        config: config.clone(),
                         title: category.name.clone().into(),
+                        description: category.description.clone().map(|d| d.into()),
                         head: Default::default(),
                         body: render_items(&category_path, &category.children, &config),
                     },
@@ -80,7 +84,9 @@ impl Gallery {
 
                 render_html(
                     AppProps {
+                        config: config.clone(),
                         title: page.name.clone().into(),
+                        description: None,
                         head: Default::default(),
                         body,
                     },
@@ -92,8 +98,10 @@ impl Gallery {
         render_html(
             AppProps {
                 title: "Gallery".into(),
+                description: config.gallery.description.clone().map(|d| d.into()),
                 head: Default::default(),
                 body: render_items("", &self.children, &config),
+                config: config.clone(),
             },
             &config.output.index_html::<false>(),
         )
@@ -106,7 +114,10 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
             match child {
                 Item::Photo(photo) => {
                     Some(html!{
-                        <a href={config.output.photo_html::<true>(&category_path, &photo.name)}>
+                        <a
+                            class="thumbnail_container"
+                            href={config.output.photo_html::<true>(&category_path, &photo.name)}
+                        >
                             <img src={config.output.thumbnail::<true>(&category_path, &photo.name)}/>
                         </a>
                     })
@@ -127,7 +138,10 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                     });
                     let (photo_path, photo) = representative.unwrap();
                     Some(html!{
-                        <a href={config.output.category_html::<true>(&category_path, &category.name)}>
+                        <a
+                            class="thumbnail_container"
+                            href={config.output.category_html::<true>(&category_path, &category.name)}
+                        >
                             <img src={config.output.thumbnail::<true>(&photo_path, &photo.name)}/>
                         </a>
                     })
@@ -156,8 +170,11 @@ fn render_html(props: AppProps, path: &str) {
 
 #[derive(Properties, PartialEq)]
 pub struct AppProps {
+    pub config: Config,
     #[prop_or("chillphoto".into())]
     pub title: AttrValue,
+    #[prop_or(None)]
+    pub description: Option<AttrValue>,
     #[prop_or_default]
     pub head: Html,
     pub body: Html,
@@ -165,22 +182,109 @@ pub struct AppProps {
 
 #[function_component(App)]
 pub fn app(props: &AppProps) -> Html {
+    let style = Html::from_html_unchecked(
+        r#"
+        body {
+            background-color: #222222;
+        }
+
+        #page {
+            background-color: #fbfbfb;
+            margin: 2rem;
+            display: flex;
+            flex-direction: column;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        header, footer {
+            background-color: #dadfbb;
+            padding-left: 2rem;
+        }
+
+        h1 {
+            font-weight: normal;
+            letter-spacing: 0.1rem;
+        }
+
+        nav {
+            background-color: #505050;
+            padding: 0.5rem;
+            padding-left: 2rem;
+        }
+
+        nav > a {
+            color: white;
+            text-decoration: none;
+        }
+
+        #main_and_sidebar {
+        
+        }
+
+        main {
+            margin: 2rem;
+        }
+
+        #sidebar {
+        
+        }
+
+        footer {
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        .thumbnail_container {
+            padding: 0.5rem;
+            display: inline-block;
+            margin: 0.25rem;
+            border: 1px solid #e6e6e6;
+            background-color: #FBFBF8;
+        }
+    "#
+        .into(),
+    );
+
     html! {
         <html>
             <head>
+                <meta charset="UTF-8"/>
                 <title>{props.title.clone()}</title>
+                if let Some(description) = props.description.clone() {
+                    <meta name="description" content={description}/>
+                }
+                if let Some(author) = props.config.gallery.author.clone() {
+                    <meta name="author" content={author}/>
+                }
+                <meta name="generator" content="chillphoto"/>
+                // Favicon
                 {props.head.clone()}
+                <style>{style}</style>
             </head>
             <body>
-                {props.body.clone()}
+                <div id="page">
+                    <header>
+                        <h1>{props.config.gallery.title.clone()}</h1>
+                    </header>
+                    <nav>
+                        <a href="/">{"Home"}</a>
+                    </nav>
+                    <div id="main_and_sidebar">
+                        <main>
+                            {props.body.clone()}
+                        </main>
+                        <div id="sidebar">
+
+                        </div>
+                    </div>
+                    <footer>
+                        if let Some(author) = &props.config.gallery.author {
+                            {format!("Published by {author}")}
+                        }
+                    </footer>
+                </div>
             </body>
         </html>
     }
 }
-
-/*
-#[function_component(Gallery)]
-pub fn gallery() -> Html {
-
-}
-*/

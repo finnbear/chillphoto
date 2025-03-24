@@ -31,6 +31,7 @@ impl Gallery {
             } else {
                 current_items.push(Item::Category(Category {
                     name: category_name.to_string(),
+                    description: None,
                     children: Vec::new(),
                 }));
 
@@ -102,6 +103,7 @@ impl Item {
 #[derive(Debug, Clone)]
 pub struct Category {
     pub name: String,
+    pub description: Option<String>,
     pub children: Vec<Item>,
 }
 
@@ -120,6 +122,7 @@ impl Category {
 #[derive(Debug, Clone)]
 pub struct Page {
     pub name: String,
+    pub description: Option<String>,
     pub content: String,
     pub format: PageFormat,
 }

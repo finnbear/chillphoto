@@ -3,24 +3,32 @@ use std::path::Path;
 
 use crate::util::add_trailing_slash_if_nonempty;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct Config {
     pub input: InputConfig,
+    pub gallery: GalleryConfig,
     pub thumbnail: ThumbnailConfig,
     pub output: OutputConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct InputConfig {
     #[serde(default = "default_input_path")]
     pub path: String,
 }
 
 fn default_input_path() -> String {
-    String::from("**")
+    String::from("**/*.{png,PNG,jpg,JPG,txt,md,html}")
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, PartialEq, Debug)]
+pub struct GalleryConfig {
+    pub title: String,
+    pub author: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct ThumbnailConfig {
     #[serde(default = "default_thumbnail_resolution")]
     pub resolution: u32,
@@ -30,7 +38,7 @@ fn default_thumbnail_resolution() -> u32 {
     100
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct OutputConfig {
     #[serde(default = "default_output_path")]
     pub path: String,

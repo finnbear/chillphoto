@@ -77,6 +77,7 @@ fn main() {
             let mut to_insert = gallery.get_or_create_category(&categories);
             to_insert.push(Item::Page(Page {
                 name: name.rsplit_once('.').unwrap().0.to_owned(),
+                description: None,
                 content: file,
                 format,
             }));
@@ -90,6 +91,7 @@ fn main() {
 
         let mut photo = Photo {
             name: name.to_owned(),
+            description: None,
             thumbnail: generate_thumbnail(&config.thumbnail, &img),
             preview: generate_preview(&img),
             image: img,

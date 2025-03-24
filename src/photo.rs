@@ -5,6 +5,7 @@ use std::fmt::Debug;
 #[derive(Clone)]
 pub struct Photo {
     pub name: String,
+    pub description: Option<String>,
     pub image: RgbImage,
     pub preview: RgbImage,
     pub thumbnail: RgbImage,
