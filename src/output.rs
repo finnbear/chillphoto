@@ -5,6 +5,7 @@ use crate::{
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::borrow::Borrow;
 use std::{fs, sync::Arc};
 use yew::{
     function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer, Properties,
@@ -47,8 +48,14 @@ impl Gallery {
                         description: photo.description.clone().map(|d| d.into()),
                         head: Default::default(),
                         body: html! {
-                            <a href={config.output.photo::<true>(&path, &photo.name)}>
-                                <img src={config.output.preview::<true>(&path, &photo.name)}/>
+                            <a
+                                class="preview_container"
+                                href={config.output.photo::<true>(&path, &photo.name)}
+                            >
+                                <img
+                                    class="preview"
+                                    src={config.output.preview::<true>(&path, &photo.name)}
+                                />
                             </a>
                         },
                     },
@@ -118,7 +125,10 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                             class="thumbnail_container"
                             href={config.output.photo_html::<true>(&category_path, &photo.name)}
                         >
-                            <img src={config.output.thumbnail::<true>(&category_path, &photo.name)}/>
+                            <img
+                                src={config.output.thumbnail::<true>(&category_path, &photo.name)}
+                                class="thumbnail"
+                            />
                         </a>
                     })
                 }
@@ -197,32 +207,33 @@ pub fn app(props: &AppProps) -> Html {
             overflow: hidden;
         }
 
-        header, footer {
+        #header, #footer {
             background-color: #dadfbb;
             padding-left: 2rem;
         }
 
-        h1 {
+        #title {
             font-weight: normal;
             letter-spacing: 0.1rem;
         }
 
-        nav {
+        #nav {
             background-color: #505050;
             padding: 0.5rem;
             padding-left: 2rem;
         }
 
-        nav > a {
+        #nav > a {
             color: white;
             text-decoration: none;
         }
 
         #main_and_sidebar {
-        
+            display: flex;
+            flex-direction: row;
         }
 
-        main {
+        #page_main_body {
             margin: 2rem;
         }
 
@@ -230,9 +241,13 @@ pub fn app(props: &AppProps) -> Html {
         
         }
 
-        footer {
+        #footer {
             text-align: center;
             padding: 0.5rem;
+        }
+
+        #footer > a {
+            text-decoration: none;
         }
 
         .thumbnail_container {
@@ -241,6 +256,10 @@ pub fn app(props: &AppProps) -> Html {
             margin: 0.25rem;
             border: 1px solid #e6e6e6;
             background-color: #FBFBF8;
+        }
+
+        .preview {
+            width: 100%;
         }
     "#
         .into(),
@@ -264,27 +283,56 @@ pub fn app(props: &AppProps) -> Html {
             </head>
             <body>
                 <div id="page">
-                    <header>
-                        <h1>{props.config.gallery.title.clone()}</h1>
+                    <header id="header">
+                        <h1 id="title">{props.config.gallery.title.clone()}</h1>
                     </header>
-                    <nav>
+                    <nav id="nav">
                         <a href="/">{"Home"}</a>
                     </nav>
                     <div id="main_and_sidebar">
-                        <main>
+                        <main id="page_main_body">
                             {props.body.clone()}
                         </main>
-                        <div id="sidebar">
+                        <aside id="sidebar">
 
-                        </div>
+                        </aside>
                     </div>
-                    <footer>
-                        if let Some(author) = &props.config.gallery.author {
-                            {format!("Published by {author}")}
-                        }
+                    <footer id="footer">
+                    {join(&props.config.gallery.author.as_ref().map(|author| {
+                        {html!{<>
+                            {"Published by "}
+                            {author}
+                        </>}}
+                    }).into_iter()
+                        .chain(std::iter::once(html!{<>
+                            {"Powered by "}
+                            <a
+                                href="https://github.com/finnbear/chillphoto"
+                                target="_blank"
+                            >{"chillphoto"}</a>
+                        </>}))
+                        .collect::<Vec<_>>(), &html!{{" | "}})}
                     </footer>
                 </div>
             </body>
         </html>
     }
+}
+
+// TODO: wait for `slice_concat_ext` stabilization.
+fn join<T: Clone>(slice: &[T], sep: &T) -> Vec<T> {
+    let mut iter = slice.iter();
+    let first = match iter.next() {
+        Some(first) => first,
+        None => return vec![],
+    };
+    let size = slice.len() * 2 - 1;
+    let mut result = Vec::with_capacity(size);
+    result.extend_from_slice(std::slice::from_ref(first));
+
+    for v in iter {
+        result.push(sep.clone());
+        result.extend_from_slice(std::slice::from_ref(v))
+    }
+    result
 }
