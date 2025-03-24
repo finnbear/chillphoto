@@ -31,6 +31,7 @@ impl Gallery {
             } else {
                 current_items.push(Item::Category(Category {
                     name: category_name.to_string(),
+                    creation_date: None,
                     description: None,
                     children: Vec::new(),
                 }));
@@ -98,11 +99,20 @@ impl Item {
             None
         }
     }
+
+    pub fn page(&self) -> Option<&Page> {
+        if let Self::Page(page) = self {
+            Some(page)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Category {
     pub name: String,
+    pub creation_date: Option<String>,
     pub description: Option<String>,
     pub children: Vec<Item>,
 }
@@ -119,7 +129,7 @@ impl Category {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Page {
     pub name: String,
     pub description: Option<String>,
@@ -127,7 +137,7 @@ pub struct Page {
     pub format: PageFormat,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageFormat {
     PlainText,
     Markdown,

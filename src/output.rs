@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, OutputConfig},
-    gallery::{Gallery, Item, PageFormat},
+    gallery::{Gallery, Item, Page, PageFormat},
     photo::Photo,
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
 };
@@ -19,6 +19,12 @@ impl Gallery {
         }
 
         let mut pages = Vec::new();
+        let page_items = self
+            .children
+            .iter()
+            .filter_map(|i| i.page().cloned())
+            .map(|p| (String::new(), p))
+            .collect::<Vec<_>>();
 
         self.visit_items(|path, item| {
             let path = path.join("/");
@@ -60,6 +66,7 @@ impl Gallery {
                                 />
                             </a>
                         },
+                        pages: Vec::new(),
                     },
                     &config.output.photo_html::<false>(&path, &photo.name),
                 )
@@ -76,6 +83,7 @@ impl Gallery {
                         description: category.description.clone().map(|d| d.into()),
                         head: Default::default(),
                         body: render_items(&category_path, &category.children, &config),
+                        pages: page_items.clone(),
                     },
                     &config.output.category_html::<false>(&path, &category.name),
                 )
@@ -98,6 +106,7 @@ impl Gallery {
                         description: None,
                         head: Default::default(),
                         body,
+                        pages: page_items.clone(),
                     },
                     &config.output.page_html::<false>(&path, &page.name),
                 )
@@ -110,6 +119,7 @@ impl Gallery {
                 description: config.gallery.description.clone().map(|d| d.into()),
                 head: Default::default(),
                 body: render_items("", &self.children, &config),
+                pages: page_items,
                 config: config.clone(),
             },
             &config.output.index_html::<false>(),
@@ -156,7 +166,7 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                     let (photo_path, photo) = representative.unwrap();
                     Some(html!{
                         <a
-                            class="thumbnail_container"
+                            class="thumbnail_container category_item"
                             href={config.output.category_html::<true>(&category_path, &category.name)}
                         >
                             <img
@@ -168,6 +178,21 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                                 )}
                                 src={config.output.thumbnail::<true>(&photo_path, &photo.name)}
                             />
+                            <div class="category_item_info">
+                                <h2 class="category_item_name">
+                                    {category.name.clone()}
+                                </h2>
+                                if let Some(creation_date) = category.creation_date.clone() {
+                                    <div class="category_item_creation_date">
+                                        {creation_date}
+                                    </div>
+                                }
+                                if let Some(description) = category.description.clone() {
+                                    <div class="category_item_description">
+                                        {description}
+                                    </div>
+                                }
+                            </div>
                         </a>
                     })
                 }
@@ -203,6 +228,7 @@ pub struct AppProps {
     #[prop_or_default]
     pub head: Html,
     pub body: Html,
+    pub pages: Vec<(String, Page)>,
 }
 
 #[function_component(App)]
@@ -211,6 +237,11 @@ pub fn app(props: &AppProps) -> Html {
         r#"
         body {
             background-color: #222222;
+        }
+
+        a {
+            text-decoration: none;
+            color: #82996F;
         }
 
         #page {
@@ -240,7 +271,6 @@ pub fn app(props: &AppProps) -> Html {
 
         #nav > a {
             color: white;
-            text-decoration: none;
         }
 
         #main_and_sidebar {
@@ -255,7 +285,21 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         #sidebar {
+            width: 20rem;
+            box-shadow: -0.25rem 0px 0.5rem 0 rgba(0, 0, 0, 0.1);
+            padding: 0.5rem;
+        }
 
+        .sidebar_panel {
+            border-bottom: 1px dashed darkgray;
+            padding: 1rem;
+        }
+
+        .sidebar_panel_heading {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: normal;
+            font-style: italic;
         }
 
         #footer {
@@ -263,16 +307,29 @@ pub fn app(props: &AppProps) -> Html {
             padding: 0.5rem;
         }
 
-        #footer > a {
-            text-decoration: none;
-        }
-
         .thumbnail_container {
             padding: 0.5rem;
-            display: inline-block;
+            display: inline-flex;
+            flex-direction: row;
+            gap: 0.5rem;
             margin: 0.25rem;
             border: 1px solid #e6e6e6;
             background-color: #FBFBF8;
+        }
+
+        .category_item_info {
+            width: 10rem;
+        }
+
+        .category_item_name {
+            margin: 0;
+            overflow-wrap: anywhere;
+            font-size: 1rem;
+            font-weight: normal;
+            color: #82996F;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
         }
 
         .preview {
@@ -316,7 +373,18 @@ pub fn app(props: &AppProps) -> Html {
                             {props.body.clone()}
                         </main>
                         <aside id="sidebar">
-
+                            if !props.pages.is_empty() {
+                                <div class="sidebar_panel">
+                                    <h2 class="sidebar_panel_heading">{"Pages"}</h2>
+                                    <ul class="sidebar_panel_list">
+                                        {props.pages.iter().map(|(path, page)| html!{
+                                            <li class="sidebar_panel_list_item">
+                                                <a class="sidebar_panel_list_link" href="/">{page.name.clone()}</a>
+                                            </li>
+                                        }).collect::<Html>()}
+                                    </ul>
+                                </div>
+                            }
                         </aside>
                     </div>
                     <footer id="footer">
