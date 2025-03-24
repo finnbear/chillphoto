@@ -54,6 +54,8 @@ impl Gallery {
                             >
                                 <img
                                     class="preview"
+                                    width={photo.preview.width().to_string()}
+                                    height={photo.preview.height().to_string()}
                                     src={config.output.preview::<true>(&path, &photo.name)}
                                 />
                             </a>
@@ -127,6 +129,11 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                         >
                             <img
                                 src={config.output.thumbnail::<true>(&category_path, &photo.name)}
+                                style={format!(
+                                    "width: {}; height: {};",
+                                    config.thumbnail.resolution,
+                                    config.thumbnail.resolution
+                                )}
                                 class="thumbnail"
                             />
                         </a>
@@ -152,7 +159,15 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                             class="thumbnail_container"
                             href={config.output.category_html::<true>(&category_path, &category.name)}
                         >
-                            <img src={config.output.thumbnail::<true>(&photo_path, &photo.name)}/>
+                            <img
+                                class="thumbnail"
+                                style={format!(
+                                    "width: {}; height: {};",
+                                    config.thumbnail.resolution,
+                                    config.thumbnail.resolution
+                                )}
+                                src={config.output.thumbnail::<true>(&photo_path, &photo.name)}
+                            />
                         </a>
                     })
                 }
@@ -231,14 +246,16 @@ pub fn app(props: &AppProps) -> Html {
         #main_and_sidebar {
             display: flex;
             flex-direction: row;
+            flex-grow: 1;
         }
 
         #page_main_body {
             margin: 2rem;
+            flex-grow: 1;
         }
 
         #sidebar {
-        
+
         }
 
         #footer {
@@ -260,6 +277,11 @@ pub fn app(props: &AppProps) -> Html {
 
         .preview {
             width: 100%;
+            height: auto;
+        }
+
+        .thumbnail, .preview {
+            background-color: #282828;
         }
     "#
         .into(),
