@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use category_path::CategoryPath;
+use chrono::NaiveDate;
 use config::{Config, ThumbnailConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, PageFormat};
@@ -16,6 +18,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 use wax::Glob;
 
+mod category_path;
 mod config;
 mod exif;
 mod gallery;
@@ -56,9 +59,9 @@ fn main() {
         let entry = entry.unwrap();
         let name = entry.matched().complete().to_owned();
         let (categories, name) = if let Some((categories, name)) = name.rsplit_once('/') {
-            (categories.split('/').collect::<Vec<_>>(), name)
+            (CategoryPath::new(categories), name)
         } else {
-            (Vec::new(), name.as_str())
+            (CategoryPath::ROOT, name.as_str())
         };
 
         let page_format = if name.ends_with(".html") {
@@ -108,7 +111,21 @@ fn main() {
     let mut photos = 0usize;
     let mut pages = 0usize;
     gallery.visit_items_mut(|_, item| match item {
-        Item::Category(_) => {
+        Item::Category(category) => {
+            let mut first_date = Option::<NaiveDate>::None;
+
+            category.visit_items(&CategoryPath::ROOT, |_, child| {
+                if let Item::Photo(photo) = child {
+                    if let Some(date) = photo.exif.date() {
+                        if first_date.map(|fd| date < fd).unwrap_or(true) {
+                            first_date = Some(date);
+                        }
+                    }
+                }
+            });
+
+            category.creation_date = first_date;
+
             categories += 1;
         }
         Item::Photo(_) => {

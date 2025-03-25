@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::path::Path;
 
-use crate::util::add_trailing_slash_if_nonempty;
+use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty};
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct Config {
@@ -18,7 +18,7 @@ pub struct InputConfig {
 }
 
 fn default_input_path() -> String {
-    String::from("**/*.{png,PNG,jpg,JPG,txt,md,html}")
+    String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html}")
 }
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
@@ -59,7 +59,7 @@ impl OutputConfig {
 
     pub fn variation<const PUBLIC: bool>(
         &self,
-        category: &str,
+        category: &CategoryPath,
         name: &str,
         variation: &str,
     ) -> String {
@@ -67,7 +67,7 @@ impl OutputConfig {
             .rsplit_once('.')
             .map(|(name, extension)| (name, format!(".{extension}")))
             .unwrap_or((name, String::new()));
-        let category = add_trailing_slash_if_nonempty(category);
+        let category = add_trailing_slash_if_nonempty(&category.to_string_without_leading_slash());
         let path = format!("{category}{name}{variation}{extension}");
         if PUBLIC {
             format!("/{path}")
@@ -76,34 +76,37 @@ impl OutputConfig {
         }
     }
 
-    pub fn photo<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn photo<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         self.variation::<PUBLIC>(category, name, "")
     }
 
-    pub fn photo_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn photo_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
     }
 
-    pub fn preview<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn preview<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         self.variation::<PUBLIC>(category, name, "_preview")
     }
 
-    pub fn thumbnail<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn thumbnail<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         self.variation::<PUBLIC>(category, name, "_thumbnail")
     }
 
-    pub fn category_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn category_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!(
             "{}/index.html",
             self.variation::<PUBLIC>(category, name, "")
         )
     }
 
-    pub fn page_html<const PUBLIC: bool>(&self, category: &str, name: &str) -> String {
+    pub fn page_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
     }
 
     pub fn index_html<const PUBLIC: bool>(&self) -> String {
-        format!("{}.html", self.variation::<PUBLIC>("", "index", ""))
+        format!(
+            "{}.html",
+            self.variation::<PUBLIC>(&CategoryPath::ROOT, "index", "")
+        )
     }
 }

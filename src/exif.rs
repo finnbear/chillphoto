@@ -1,13 +1,17 @@
+use chrono::NaiveDate;
 use exif::{Exif, In, Tag};
 use std::io::Cursor;
 
+/// https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 #[derive(Debug, Clone)]
 pub struct ExifData {
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,
     pub lens_make: Option<String>,
     pub lens_model: Option<String>,
+    /// YYYY-MM-DD HH:MM:SS
     pub original_time_taken: Option<String>,
+    /// Seconds.
     pub exposure_time: Option<String>,
     pub aperture: Option<String>,
     // TODO: units
@@ -19,6 +23,13 @@ pub struct ExifData {
 }
 
 impl ExifData {
+    pub fn date(&self) -> Option<NaiveDate> {
+        self.original_time_taken
+            .as_ref()
+            .and_then(|s| NaiveDate::parse_and_remainder(s, "%Y-%m-%d").ok())
+            .map(|(d, _)| d)
+    }
+
     pub fn load(file: &[u8]) -> Self {
         let exifreader = exif::Reader::new();
         let meta = exifreader

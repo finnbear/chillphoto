@@ -1,9 +1,11 @@
 use crate::{
+    category_path::CategoryPath,
     config::{Config, OutputConfig},
     gallery::{Gallery, Item, Page, PageFormat},
     photo::Photo,
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
 };
+use chrono::NaiveDate;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::borrow::Borrow;
 use std::{fs, sync::Arc};
@@ -23,18 +25,21 @@ impl Gallery {
             .children
             .iter()
             .filter_map(|i| i.page().cloned())
-            .map(|p| (String::new(), p))
+            .map(|p| (CategoryPath::ROOT.push(p.name.clone()), p))
             .collect::<Vec<_>>();
 
         self.visit_items(|path, item| {
-            let path = path.join("/");
-            pages.push((path, item.clone()));
+            pages.push((path.clone(), item.clone()));
         });
 
         pages.into_par_iter().for_each(|(path, item)| match item {
             Item::Photo(photo) => {
-                fs::create_dir_all(&config.output.subdirectory(&path))
-                    .expect("faailed to create item directory");
+                fs::create_dir_all(
+                    &config
+                        .output
+                        .subdirectory(&path.to_string_without_leading_slash()),
+                )
+                .expect("faailed to create item directory");
                 photo
                     .image
                     .save(config.output.photo::<false>(&path, &photo.name))
@@ -66,16 +71,20 @@ impl Gallery {
                                 />
                             </a>
                         },
-                        pages: Vec::new(),
+                        pages: page_items.clone(),
+                        path: path.push(photo.name.clone()).clone(),
                     },
                     &config.output.photo_html::<false>(&path, &photo.name),
                 )
             }
             Item::Category(category) => {
-                let category_path =
-                    format!("{}{}", add_trailing_slash_if_nonempty(&path), category.name);
-                fs::create_dir_all(&config.output.subdirectory(&category_path))
-                    .expect("faailed to create item directory");
+                let category_path = path.push(category.name.clone());
+                fs::create_dir_all(
+                    &config
+                        .output
+                        .subdirectory(&category_path.to_string_without_leading_slash()),
+                )
+                .expect("faailed to create item directory");
                 render_html(
                     AppProps {
                         config: config.clone(),
@@ -84,6 +93,7 @@ impl Gallery {
                         head: Default::default(),
                         body: render_items(&category_path, &category.children, &config),
                         pages: page_items.clone(),
+                        path: category_path.clone(),
                     },
                     &config.output.category_html::<false>(&path, &category.name),
                 )
@@ -107,6 +117,7 @@ impl Gallery {
                         head: Default::default(),
                         body,
                         pages: page_items.clone(),
+                        path: path.push(page.name.clone()).clone(),
                     },
                     &config.output.page_html::<false>(&path, &page.name),
                 )
@@ -118,16 +129,17 @@ impl Gallery {
                 title: "Gallery".into(),
                 description: config.gallery.description.clone().map(|d| d.into()),
                 head: Default::default(),
-                body: render_items("", &self.children, &config),
+                body: render_items(&CategoryPath::ROOT, &self.children, &config),
                 pages: page_items,
                 config: config.clone(),
+                path: CategoryPath::ROOT,
             },
             &config.output.index_html::<false>(),
         )
     }
 }
 
-fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
+fn render_items(category_path: &CategoryPath, items: &[Item], config: &Config) -> Html {
     html! {
         (items.iter().filter_map(|child| {
             match child {
@@ -150,17 +162,13 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                     })
                 }
                 Item::Category(category) => {
-                    let mut representative = Option::<(String, Photo)>::None;
-                    let mut category_path_2 = vec![];
-                    if !category_path.is_empty() {
-                        category_path_2.push(category_path.to_owned());
-                    }
-                    category.visit_items(&category_path_2, |path, item| {
+                    let mut representative = Option::<(CategoryPath, Photo)>::None;
+                    category.visit_items(&category_path, |path, item| {
                         if representative.is_some() {
                             return;
                         }
                         if let Item::Photo(photo) = item {
-                            representative = Some((path.join("/"), photo.clone()));
+                            representative = Some((path.clone(), photo.clone()));
                         }
                     });
                     let (photo_path, photo) = representative.unwrap();
@@ -184,7 +192,7 @@ fn render_items(category_path: &str, items: &[Item], config: &Config) -> Html {
                                 </h2>
                                 if let Some(creation_date) = category.creation_date.clone() {
                                     <div class="category_item_creation_date">
-                                        {creation_date}
+                                        {format!("{}", creation_date.format("%-d %b, %C%y"))}
                                     </div>
                                 }
                                 if let Some(description) = category.description.clone() {
@@ -221,6 +229,7 @@ fn render_html(props: AppProps, path: &str) {
 #[derive(Properties, PartialEq)]
 pub struct AppProps {
     pub config: Config,
+    pub path: CategoryPath,
     #[prop_or("chillphoto".into())]
     pub title: AttrValue,
     #[prop_or(None)]
@@ -228,7 +237,7 @@ pub struct AppProps {
     #[prop_or_default]
     pub head: Html,
     pub body: Html,
-    pub pages: Vec<(String, Page)>,
+    pub pages: Vec<(CategoryPath, Page)>,
 }
 
 #[function_component(App)]
@@ -251,7 +260,7 @@ pub fn app(props: &AppProps) -> Html {
             margin: 0rem auto;
             display: flex;
             flex-direction: column;
-            border-radius: 0.75rem;
+            border-radius: 0.5rem;
             overflow: hidden;
         }
 
@@ -265,14 +274,20 @@ pub fn app(props: &AppProps) -> Html {
             letter-spacing: 0.1rem;
         }
 
-        #nav {
+        #breadcrumbs {
             background-color: #505050;
             padding: 0.5rem;
             padding-left: 2rem;
+            color: white;
         }
 
-        #nav > a {
+        .breadcrumb {
+            color: #D1E079;
+        }
+
+        .breadcrumb_final {
             color: white;
+            font-weight: bold;
         }
 
         #main_and_sidebar {
@@ -289,7 +304,6 @@ pub fn app(props: &AppProps) -> Html {
         #sidebar {
             width: 20rem;
             box-shadow: -0.25rem 0px 0.5rem 0 rgba(0, 0, 0, 0.1);
-            padding: 0.5rem;
         }
 
         .sidebar_panel {
@@ -334,6 +348,16 @@ pub fn app(props: &AppProps) -> Html {
             overflow: hidden;
         }
 
+        .category_item_creation_date {
+            color: black;
+            font-size: 0.75rem;
+        }
+
+        .category_item_description {
+            color: black;
+            font-size: 0.5rem;
+        }
+
         .preview {
             width: 100%;
             height: auto;
@@ -367,8 +391,21 @@ pub fn app(props: &AppProps) -> Html {
                     <header id="header">
                         <h1 id="title">{props.config.gallery.title.clone()}</h1>
                     </header>
-                    <nav id="nav">
-                        <a href="/">{"Home"}</a>
+                    <nav id="breadcrumbs">
+                        {join(&props.path.iter_paths().map(|path| if path != props.path {
+                            html!{
+                                <a
+                                    class={"breadcrumb"}
+                                    href={path.to_string_with_leading_slash()}
+                                >{path.last_segment().unwrap_or("Home").to_owned()}</a>
+                            }
+                        } else {
+                            html!{
+                                <span
+                                    class={"breadcrumb breadcrumb_final"}
+                                >{path.last_segment().unwrap_or("Home").to_owned()}</span>
+                            }
+                        }).collect::<Vec<_>>(), &html!{{" » "}})}
                     </nav>
                     <div id="main_and_sidebar">
                         <main id="page_main_body">
