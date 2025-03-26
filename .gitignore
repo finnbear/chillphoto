@@ -20,5 +20,6 @@ target/
 
 /target
 
+/input
 /output
 chillphoto.toml

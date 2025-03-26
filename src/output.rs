@@ -21,11 +21,19 @@ impl Gallery {
         }
 
         let mut pages = Vec::new();
+        /// TODO: nested pages.
         let page_items = self
             .children
             .iter()
             .filter_map(|i| i.page().cloned())
-            .map(|p| (CategoryPath::ROOT.push(p.name.clone()), p))
+            .map(|p| {
+                (
+                    config
+                        .output
+                        .page_html::<true>(&CategoryPath::ROOT, &p.name),
+                    p,
+                )
+            })
             .collect::<Vec<_>>();
 
         self.visit_items(|path, item| {
@@ -100,7 +108,16 @@ impl Gallery {
             }
             Item::Page(page) => {
                 let body = match page.format {
-                    PageFormat::PlainText => Html::VText(VText::new(page.content)),
+                    PageFormat::PlainText => page
+                        .content
+                        .lines()
+                        .map(|line| {
+                            html! {<>
+                                {line}
+                                <br/>
+                            </>}
+                        })
+                        .collect(),
                     PageFormat::Markdown => Html::from_html_unchecked(
                         markdown::to_html_with_options(&page.content, &markdown::Options::gfm())
                             .unwrap()
@@ -237,7 +254,7 @@ pub struct AppProps {
     #[prop_or_default]
     pub head: Html,
     pub body: Html,
-    pub pages: Vec<(CategoryPath, Page)>,
+    pub pages: Vec<(String, Page)>,
 }
 
 #[function_component(App)]
@@ -416,9 +433,12 @@ pub fn app(props: &AppProps) -> Html {
                                 <div class="sidebar_panel">
                                     <h2 class="sidebar_panel_heading">{"Pages"}</h2>
                                     <ul class="sidebar_panel_list">
-                                        {props.pages.iter().map(|(path, page)| html!{
+                                        {props.pages.iter().map(|(href, page)| html!{
                                             <li class="sidebar_panel_list_item">
-                                                <a class="sidebar_panel_list_link" href="/">{page.name.clone()}</a>
+                                                <a
+                                                    class="sidebar_panel_list_link"
+                                                    href={href.clone()}
+                                                >{page.name.clone()}</a>
                                             </li>
                                         }).collect::<Html>()}
                                     </ul>
