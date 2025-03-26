@@ -14,7 +14,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 use wax::Glob;
 
@@ -26,11 +26,18 @@ mod output;
 mod photo;
 mod util;
 
-fn main() {
-    let start = Instant::now();
+pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     let config_text =
         fs::read_to_string("./chillphoto.toml").expect("couldn't read ./chillphoto.toml");
-    let config = toml::from_str::<Config>(&config_text).unwrap();
+    toml::from_str::<Config>(&config_text).unwrap()
+});
+
+fn main() {
+    let start = Instant::now();
+
+    LazyLock::force(&CONFIG);
+    let config = &*CONFIG;
+
     let mut input_path_string = config.input.path.clone();
     if let Some(remainder) = input_path_string.strip_prefix("~/") {
         #[allow(deprecated)]
@@ -95,7 +102,7 @@ fn main() {
         let mut photo = Photo {
             name: name.to_owned(),
             description: None,
-            thumbnail: generate_thumbnail(&config.thumbnail, &img),
+            thumbnail: generate_thumbnail(&img),
             preview: generate_preview(&img),
             image: img,
             exif: ExifData::load(&file),
@@ -142,7 +149,7 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    gallery.output(&config);
+    gallery.output();
 
     println!(
         "({:.1}s) Saved website to {}",
@@ -158,7 +165,7 @@ fn is_text_file(path: &Path) -> bool {
     }
 }
 
-fn generate_thumbnail(config: &ThumbnailConfig, img: &RgbImage) -> RgbImage {
+fn generate_thumbnail(img: &RgbImage) -> RgbImage {
     let (width, height) = img.dimensions();
     let size = width.min(height);
     let x_offset = (width - size) / 2;
@@ -166,8 +173,8 @@ fn generate_thumbnail(config: &ThumbnailConfig, img: &RgbImage) -> RgbImage {
     let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size).to_image();
     imageops::resize(
         &cropped,
-        config.resolution,
-        config.resolution,
+        CONFIG.thumbnail.resolution,
+        CONFIG.thumbnail.resolution,
         FilterType::Lanczos3,
     )
 }

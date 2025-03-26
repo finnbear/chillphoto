@@ -2,7 +2,7 @@ use crate::exif::ExifData;
 use image::RgbImage;
 use std::fmt::Debug;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Photo {
     pub name: String,
     pub description: Option<String>,

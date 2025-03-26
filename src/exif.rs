@@ -3,7 +3,7 @@ use exif::{Exif, In, Tag};
 use std::io::Cursor;
 
 /// https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExifData {
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,

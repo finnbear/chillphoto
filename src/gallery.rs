@@ -2,12 +2,35 @@ use chrono::NaiveDate;
 
 use crate::{category_path::CategoryPath, photo::Photo};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Gallery {
     pub children: Vec<Item>,
 }
 
 impl Gallery {
+    pub fn category(&self, path: &CategoryPath) -> Option<&Category> {
+        if path.is_root() {
+            return None;
+        }
+        let mut segments = path.iter_segments();
+        let first_segment = segments.next().unwrap();
+        let mut current = self
+            .children
+            .iter()
+            .filter_map(|i| i.category())
+            .find(|c| c.slug().as_str() == first_segment)?;
+
+        for segment in segments {
+            current = current
+                .children
+                .iter()
+                .filter_map(|i| i.category())
+                .find(|c| c.slug().as_str() == segment)?;
+        }
+
+        Some(current)
+    }
+
     pub fn visit_items<'a>(&'a self, mut visitor: impl FnMut(&CategoryPath, &'a Item)) {
         visit_children_items(&CategoryPath::ROOT, &self.children, &mut visitor);
     }
@@ -56,7 +79,7 @@ pub fn visit_children_items<'a>(
     for child in children {
         visitor(&path, child);
         if let Some(category) = child.category() {
-            let path = path.push(category.name.clone());
+            let path = path.push(category.slug());
             visit_children_items(&path, &category.children, visitor);
         }
     }
@@ -70,13 +93,13 @@ pub fn visit_children_items_mut(
     for child in children {
         visitor(&path, child);
         if let Some(category) = child.category_mut() {
-            let path = path.push(category.name.clone());
+            let path = path.push(category.slug());
             visit_children_items_mut(&path, &mut category.children, visitor);
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Category(Category),
     Photo(Photo),
@@ -109,7 +132,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Category {
     pub name: String,
     pub creation_date: Option<NaiveDate>,
@@ -118,12 +141,16 @@ pub struct Category {
 }
 
 impl Category {
+    pub fn slug(&self) -> String {
+        self.name.replace(' ', "-")
+    }
+
     pub fn visit_items<'a>(
         &'a self,
         path: &CategoryPath,
         mut visitor: impl FnMut(&CategoryPath, &'a Item),
     ) {
-        let path = path.push(self.name.clone());
+        let path = path.push(self.slug());
         visit_children_items(&path, &self.children, &mut visitor);
     }
 }

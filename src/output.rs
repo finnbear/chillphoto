@@ -4,6 +4,7 @@ use crate::{
     gallery::{Gallery, Item, Page, PageFormat},
     photo::Photo,
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
+    CONFIG,
 };
 use chrono::NaiveDate;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -15,7 +16,8 @@ use yew::{
 };
 
 impl Gallery {
-    pub fn output(&self, config: &Config) {
+    pub fn output(&self) {
+        let config = &*CONFIG;
         if fs::exists(&config.output.path).unwrap() {
             remove_dir_contents(&config.output.path).expect("failed to clear output directory");
         }
@@ -62,7 +64,7 @@ impl Gallery {
                     .unwrap();
                 render_html(
                     AppProps {
-                        config: config.clone(),
+                        gallery: self.clone(),
                         title: photo.name.clone().into(),
                         description: photo.description.clone().map(|d| d.into()),
                         head: Default::default(),
@@ -86,7 +88,7 @@ impl Gallery {
                 )
             }
             Item::Category(category) => {
-                let category_path = path.push(category.name.clone());
+                let category_path = path.push(category.slug());
                 fs::create_dir_all(
                     &config
                         .output
@@ -95,15 +97,17 @@ impl Gallery {
                 .expect("faailed to create item directory");
                 render_html(
                     AppProps {
-                        config: config.clone(),
+                        gallery: self.clone(),
                         title: category.name.clone().into(),
                         description: category.description.clone().map(|d| d.into()),
                         head: Default::default(),
-                        body: render_items(&category_path, &category.children, &config),
+                        body: render_items(&category_path, &category.children),
                         pages: page_items.clone(),
                         path: category_path.clone(),
                     },
-                    &config.output.category_html::<false>(&path, &category.name),
+                    &config
+                        .output
+                        .category_html::<false>(&path, &category.slug()),
                 )
             }
             Item::Page(page) => {
@@ -128,7 +132,7 @@ impl Gallery {
 
                 render_html(
                     AppProps {
-                        config: config.clone(),
+                        gallery: self.clone(),
                         title: page.name.clone().into(),
                         description: None,
                         head: Default::default(),
@@ -143,20 +147,20 @@ impl Gallery {
 
         render_html(
             AppProps {
+                gallery: self.clone(),
                 title: "Gallery".into(),
-                description: config.gallery.description.clone().map(|d| d.into()),
+                description: CONFIG.gallery.description.clone().map(|d| d.into()),
                 head: Default::default(),
-                body: render_items(&CategoryPath::ROOT, &self.children, &config),
+                body: render_items(&CategoryPath::ROOT, &self.children),
                 pages: page_items,
-                config: config.clone(),
                 path: CategoryPath::ROOT,
             },
-            &config.output.index_html::<false>(),
+            &CONFIG.output.index_html::<false>(),
         )
     }
 }
 
-fn render_items(category_path: &CategoryPath, items: &[Item], config: &Config) -> Html {
+fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
     html! {
         (items.iter().filter_map(|child| {
             match child {
@@ -164,14 +168,14 @@ fn render_items(category_path: &CategoryPath, items: &[Item], config: &Config) -
                     Some(html!{
                         <a
                             class="thumbnail_container"
-                            href={config.output.photo_html::<true>(&category_path, &photo.name)}
+                            href={CONFIG.output.photo_html::<true>(&category_path, &photo.name)}
                         >
                             <img
-                                src={config.output.thumbnail::<true>(&category_path, &photo.name)}
+                                src={CONFIG.output.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
                                     "width: {}; height: {};",
-                                    config.thumbnail.resolution,
-                                    config.thumbnail.resolution
+                                    CONFIG.thumbnail.resolution,
+                                    CONFIG.thumbnail.resolution
                                 )}
                                 class="thumbnail"
                             />
@@ -192,16 +196,16 @@ fn render_items(category_path: &CategoryPath, items: &[Item], config: &Config) -
                     Some(html!{
                         <a
                             class="thumbnail_container category_item"
-                            href={config.output.category_html::<true>(&category_path, &category.name)}
+                            href={CONFIG.output.category_html::<true>(&category_path, &category.slug())}
                         >
                             <img
                                 class="thumbnail"
                                 style={format!(
                                     "width: {}; height: {};",
-                                    config.thumbnail.resolution,
-                                    config.thumbnail.resolution
+                                    CONFIG.thumbnail.resolution,
+                                    CONFIG.thumbnail.resolution
                                 )}
-                                src={config.output.thumbnail::<true>(&photo_path, &photo.name)}
+                                src={CONFIG.output.thumbnail::<true>(&photo_path, &photo.name)}
                             />
                             <div class="category_item_info">
                                 <h2 class="category_item_name">
@@ -245,7 +249,7 @@ fn render_html(props: AppProps, path: &str) {
 
 #[derive(Properties, PartialEq)]
 pub struct AppProps {
-    pub config: Config,
+    pub gallery: Gallery,
     pub path: CategoryPath,
     #[prop_or("chillphoto".into())]
     pub title: AttrValue,
@@ -395,7 +399,7 @@ pub fn app(props: &AppProps) -> Html {
                 if let Some(description) = props.description.clone() {
                     <meta name="description" content={description}/>
                 }
-                if let Some(author) = props.config.gallery.author.clone() {
+                if let Some(author) = CONFIG.gallery.author.clone() {
                     <meta name="author" content={author}/>
                 }
                 <meta name="generator" content="chillphoto"/>
@@ -406,7 +410,7 @@ pub fn app(props: &AppProps) -> Html {
             <body>
                 <div id="page">
                     <header id="header">
-                        <h1 id="title">{props.config.gallery.title.clone()}</h1>
+                        <h1 id="title">{CONFIG.gallery.title.clone()}</h1>
                     </header>
                     <nav id="breadcrumbs">
                         {join(&props.path.iter_paths().map(|path| if path != props.path {
@@ -414,13 +418,13 @@ pub fn app(props: &AppProps) -> Html {
                                 <a
                                     class={"breadcrumb"}
                                     href={path.to_string_with_leading_slash()}
-                                >{path.last_segment().unwrap_or("Home").to_owned()}</a>
+                                >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
                             }
                         } else {
                             html!{
                                 <span
                                     class={"breadcrumb breadcrumb_final"}
-                                >{path.last_segment().unwrap_or("Home").to_owned()}</span>
+                                >{props.gallery.category(&path).map(|c| c.name.as_str()).or(path.last_segment()).unwrap_or("Home").to_owned()}</span>
                             }
                         }).collect::<Vec<_>>(), &html!{{" » "}})}
                     </nav>
@@ -447,7 +451,7 @@ pub fn app(props: &AppProps) -> Html {
                         </aside>
                     </div>
                     <footer id="footer">
-                    {join(&props.config.gallery.author.as_ref().map(|author| {
+                    {join(&CONFIG.gallery.author.as_ref().map(|author| {
                         {html!{<>
                             {"Published by "}
                             {author}
