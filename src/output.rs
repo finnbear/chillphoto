@@ -307,7 +307,7 @@ pub fn app(props: &AppProps) -> Html {
     let style = Html::from_html_unchecked(
         r#"
         html {
-            font-size: calc(7px + 1vw);
+            font-size: calc(8px + 0.8vw);
         }
 
         body {
@@ -315,6 +315,11 @@ pub fn app(props: &AppProps) -> Html {
             margin: 2rem;
             user-select: none;
             -webkit-user-drag: none;
+            font-family: "Helvetica Neue", "Lucida Grande", Arial, Helvetica, sans-serif;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: Times, "Times New Roman", Georgia, serif;
         }
 
         a {
@@ -324,7 +329,7 @@ pub fn app(props: &AppProps) -> Html {
 
         #page {
             background-color: #fbfbfb;
-            max-width: 80rem;
+            max-width: 60rem;
             margin: 0rem auto;
             display: flex;
             flex-direction: column;
