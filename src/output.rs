@@ -94,6 +94,7 @@ impl Gallery {
                                     class="preview"
                                     width={photo.preview.width().to_string()}
                                     height={photo.preview.height().to_string()}
+                                    alt={photo.name.clone()}
                                     src={config.output.preview::<true>(&path, &photo.name)}
                                 />
                             </a>
@@ -179,7 +180,7 @@ impl Gallery {
         render_html(
             AppProps {
                 gallery: self.clone(),
-                title: "Gallery".into(),
+                title: config.gallery.title.clone().into(),
                 description: CONFIG.gallery.description.clone().map(|d| d.into()),
                 head: Default::default(),
                 body: render_items(&CategoryPath::ROOT, &self.children),
@@ -211,6 +212,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                             href={CONFIG.output.photo_html::<true>(&category_path, &photo.name)}
                         >
                             <img
+                                alt={photo.name.clone()}
                                 src={CONFIG.output.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
                                     "width: {}; height: {};",
@@ -245,6 +247,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                                     CONFIG.thumbnail.resolution,
                                     CONFIG.thumbnail.resolution
                                 )}
+                                alt={photo.name.clone()}
                                 src={CONFIG.output.thumbnail::<true>(&photo_path, &photo.name)}
                             />
                             <div class="category_item_info">
@@ -279,10 +282,13 @@ fn render_html(props: AppProps, path: &str) {
     let mut options = markup_fmt::config::FormatOptions::default();
     options.layout.use_tabs = true;
     options.layout.indent_width = 1;
-    let html = markup_fmt::format_text(&html, markup_fmt::Language::Html, &options, |code, _| {
-        Ok::<_, std::convert::Infallible>(code.into())
-    })
-    .unwrap();
+    let mut html =
+        markup_fmt::format_text(&html, markup_fmt::Language::Html, &options, |code, _| {
+            Ok::<_, std::convert::Infallible>(code.into())
+        })
+        .unwrap();
+
+    html.insert_str(0, "<!DOCTYPE html>\n");
 
     fs::write(path, html).expect(path);
 }
@@ -306,6 +312,11 @@ pub struct AppProps {
 pub fn app(props: &AppProps) -> Html {
     let style = Html::from_html_unchecked(
         r#"
+        :root {
+            --colored-text-light-background: #4d5a41;
+            --colored-text-dark-background: #e0ff28;
+        }
+
         html {
             font-size: calc(8px + 0.8vw);
         }
@@ -324,7 +335,7 @@ pub fn app(props: &AppProps) -> Html {
 
         a {
             text-decoration: none;
-            color: #82996F;
+            color: var(--colored-text-light-background);
         }
 
         #page {
@@ -374,7 +385,7 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         .breadcrumb {
-            color: #D1E079;
+            color: var(--colored-text-dark-background);
         }
 
         .breadcrumb_final {
@@ -386,6 +397,7 @@ pub fn app(props: &AppProps) -> Html {
             display: flex;
             flex-direction: row;
             flex-grow: 1;
+            min-height: 24rem;
         }
 
         #page_main_body {
@@ -416,7 +428,8 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         .sidebar_panel_list_item { 
-            list-style: none; 
+            list-style: none;
+            margin-top: 0.2rem;
         } 
   
         .sidebar_panel_list_item::before { 
@@ -433,7 +446,6 @@ pub fn app(props: &AppProps) -> Html {
             display: inline-flex;
             flex-direction: row;
             gap: 0.5rem;
-            margin: 0.25rem;
             border: 1px solid #e6e6e6;
             background-color: #FBFBF8;
         }
@@ -447,7 +459,7 @@ pub fn app(props: &AppProps) -> Html {
             overflow-wrap: anywhere;
             font-size: 1rem;
             font-weight: normal;
-            color: #82996F;
+            color: var(--colored-text-light-background);
             text-overflow: ellipsis;
             white-space: nowrap;
             overflow: hidden;
@@ -476,7 +488,7 @@ pub fn app(props: &AppProps) -> Html {
     );
 
     html! {
-        <html>
+        <html lang="en">
             <head>
                 <meta charset="UTF-8"/>
                 <title>{props.title.clone()}</title>
@@ -487,6 +499,7 @@ pub fn app(props: &AppProps) -> Html {
                     <meta name="author" content={author}/>
                 }
                 <meta name="generator" content="chillphoto"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 // Favicon
                 {props.head.clone()}
                 <style>{style}</style>
