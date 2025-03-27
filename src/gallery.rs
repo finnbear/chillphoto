@@ -107,6 +107,14 @@ pub enum Item {
 }
 
 impl Item {
+    pub fn photo(&self) -> Option<&Photo> {
+        if let Self::Photo(photo) = self {
+            Some(photo)
+        } else {
+            None
+        }
+    }
+
     pub fn category(&self) -> Option<&Category> {
         if let Self::Category(category) = self {
             Some(category)

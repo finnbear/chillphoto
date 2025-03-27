@@ -7,12 +7,13 @@ use crate::{
     CONFIG,
 };
 use chrono::NaiveDate;
+use core::num;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::borrow::Borrow;
 use std::{fs, sync::Arc};
 use yew::{
-    function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer, Properties,
-    ServerRenderer,
+    classes, function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer,
+    Properties, ServerRenderer,
 };
 
 impl Gallery {
@@ -44,6 +45,22 @@ impl Gallery {
 
         pages.into_par_iter().for_each(|(path, item)| match item {
             Item::Photo(photo) => {
+                let mut num_photos = 0usize;
+                let mut photo_index = Option::<usize>::None;
+                let photos = self
+                    .category(&path)
+                    .unwrap()
+                    .children
+                    .iter()
+                    .filter_map(|i| i.photo())
+                    .collect::<Vec<_>>();
+                for p in &photos {
+                    if p.name == photo.name {
+                        photo_index = Some(num_photos);
+                    }
+                    num_photos += 1;
+                }
+                let photo_index = photo_index.unwrap();
                 fs::create_dir_all(
                     &config
                         .output
@@ -83,6 +100,18 @@ impl Gallery {
                         },
                         pages: page_items.clone(),
                         path: path.push(photo.name.clone()).clone(),
+                        relative: Some(RelativeNavigation {
+                            index: photo_index,
+                            count: num_photos,
+                            previous: photo_index
+                                .checked_sub(1)
+                                .and_then(|i| photos.get(i))
+                                .map(|p| config.output.photo_html::<true>(&path, &p.name)),
+                            next: photo_index
+                                .checked_add(1)
+                                .and_then(|i| photos.get(i))
+                                .map(|p| config.output.photo_html::<true>(&path, &p.name)),
+                        }),
                     },
                     &config.output.photo_html::<false>(&path, &photo.name),
                 )
@@ -104,6 +133,7 @@ impl Gallery {
                         body: render_items(&category_path, &category.children),
                         pages: page_items.clone(),
                         path: category_path.clone(),
+                        relative: None,
                     },
                     &config
                         .output
@@ -139,6 +169,7 @@ impl Gallery {
                         body,
                         pages: page_items.clone(),
                         path: path.push(page.name.clone()).clone(),
+                        relative: None,
                     },
                     &config.output.page_html::<false>(&path, &page.name),
                 )
@@ -154,10 +185,19 @@ impl Gallery {
                 body: render_items(&CategoryPath::ROOT, &self.children),
                 pages: page_items,
                 path: CategoryPath::ROOT,
+                relative: None,
             },
             &CONFIG.output.index_html::<false>(),
         )
     }
+}
+
+#[derive(PartialEq)]
+pub struct RelativeNavigation {
+    index: usize,
+    count: usize,
+    previous: Option<String>,
+    next: Option<String>,
 }
 
 fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
@@ -259,15 +299,22 @@ pub struct AppProps {
     pub head: Html,
     pub body: Html,
     pub pages: Vec<(String, Page)>,
+    pub relative: Option<RelativeNavigation>,
 }
 
 #[function_component(App)]
 pub fn app(props: &AppProps) -> Html {
     let style = Html::from_html_unchecked(
         r#"
+        html {
+            font-size: calc(7px + 1vw);
+        }
+
         body {
             background-color: #222222;
             margin: 2rem;
+            user-select: none;
+            -webkit-user-drag: none;
         }
 
         a {
@@ -287,12 +334,31 @@ pub fn app(props: &AppProps) -> Html {
 
         #header, #footer {
             background-color: #dadfbb;
-            padding-left: 2rem;
+        }
+
+        #header {
+            display: flex;
+            flex-direction: row;
+            gap: 1rem;
+            align-items: center;
+            padding: 2.5rem 2rem;
         }
 
         #title {
             font-weight: normal;
             letter-spacing: 0.1rem;
+            flex-grow: 1;
+            margin: 0;
+        }
+
+        #relative_navigation {
+            display: flex;
+            flex-direction: row;
+            gap: 0.5rem;
+        }
+
+        .relative_navigation_unavailable {
+            opacity: 0.5;
         }
 
         #breadcrumbs {
@@ -323,7 +389,8 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         #sidebar {
-            width: 20rem;
+            min-width: 18rem;
+            width: 18rem;
             box-shadow: -0.25rem 0px 0.5rem 0 rgba(0, 0, 0, 0.1);
         }
 
@@ -338,6 +405,18 @@ pub fn app(props: &AppProps) -> Html {
             font-weight: normal;
             font-style: italic;
         }
+
+        .sidebar_panel_list {
+            padding-inline-start: 0.5rem;
+        }
+
+        .sidebar_panel_list_item { 
+            list-style: none; 
+        } 
+  
+        .sidebar_panel_list_item::before { 
+            content: "\00BB"; 
+        } 
 
         #footer {
             text-align: center;
@@ -411,6 +490,24 @@ pub fn app(props: &AppProps) -> Html {
                 <div id="page">
                     <header id="header">
                         <h1 id="title">{CONFIG.gallery.title.clone()}</h1>
+                        if let Some(relative) = &props.relative {
+                            <div id="relative_navigation">
+                                <a
+                                    href={relative.previous.clone()}
+                                    class={classes!(
+                                        "relative_navigation_previous",
+                                        relative.previous.is_none().then_some("relative_navigation_unavailable"),
+                                    )}
+                                >{"Previous"}</a>
+                                <a
+                                    href={relative.next.clone()}
+                                    class={classes!(
+                                        "relative_navigation_previous",
+                                        relative.next.is_none().then_some("relative_navigation_unavailable"),
+                                    )}
+                                >{"Next"}</a>
+                            </div>
+                        }
                     </header>
                     <nav id="breadcrumbs">
                         {join(&props.path.iter_paths().map(|path| if path != props.path {
@@ -427,6 +524,9 @@ pub fn app(props: &AppProps) -> Html {
                                 >{props.gallery.category(&path).map(|c| c.name.as_str()).or(path.last_segment()).unwrap_or("Home").to_owned()}</span>
                             }
                         }).collect::<Vec<_>>(), &html!{{" » "}})}
+                        if let Some(relative) = &props.relative {
+                            {format!(" ({}/{})", relative.index + 1, relative.count)}
+                        }
                     </nav>
                     <div id="main_and_sidebar">
                         <main id="page_main_body">
@@ -451,19 +551,19 @@ pub fn app(props: &AppProps) -> Html {
                         </aside>
                     </div>
                     <footer id="footer">
-                    {join(&CONFIG.gallery.author.as_ref().map(|author| {
-                        {html!{<>
-                            {"Published by "}
-                            {author}
-                        </>}}
-                    }).into_iter()
-                        .chain(std::iter::once(html!{<>
-                            {"Powered by "}
-                            <a
-                                href="https://github.com/finnbear/chillphoto"
-                                target="_blank"
-                            >{"chillphoto"}</a>
-                        </>}))
+                        {join(&CONFIG.gallery.author.as_ref().map(|author| {
+                            {html!{<>
+                                {"Published by "}
+                                {author}
+                            </>}}
+                        }).into_iter()
+                            .chain(std::iter::once(html!{<>
+                                {"Powered by "}
+                                <a
+                                    href="https://github.com/finnbear/chillphoto"
+                                    target="_blank"
+                                >{"chillphoto"}</a>
+                            </>}))
                         .collect::<Vec<_>>(), &html!{{" | "}})}
                     </footer>
                 </div>
