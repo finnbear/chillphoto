@@ -100,7 +100,7 @@ fn main() {
             .to_rgb8();
 
         let mut photo = Photo {
-            name: name.to_owned(),
+            name: name.rsplit_once('.').unwrap().0.to_owned(),
             description: None,
             thumbnail: generate_thumbnail(&img),
             preview: generate_preview(&img),

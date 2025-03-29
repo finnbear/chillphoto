@@ -25,6 +25,7 @@ fn default_input_path() -> String {
 pub struct GalleryConfig {
     pub title: String,
     pub author: Option<String>,
+    pub author_url: Option<String>,
     pub description: Option<String>,
 }
 
@@ -77,7 +78,7 @@ impl OutputConfig {
     }
 
     pub fn photo<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        self.variation::<PUBLIC>(category, name, "")
+        format!("{}.jpg", self.variation::<PUBLIC>(category, name, ""))
     }
 
     pub fn photo_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
@@ -85,11 +86,17 @@ impl OutputConfig {
     }
 
     pub fn preview<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        self.variation::<PUBLIC>(category, name, "_preview")
+        format!(
+            "{}.webp",
+            self.variation::<PUBLIC>(category, name, "_preview")
+        )
     }
 
     pub fn thumbnail<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        self.variation::<PUBLIC>(category, name, "_thumbnail")
+        format!(
+            "{}.webp",
+            self.variation::<PUBLIC>(category, name, "_thumbnail")
+        )
     }
 
     pub fn category_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {

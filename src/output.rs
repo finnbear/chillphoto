@@ -430,6 +430,7 @@ pub fn app(props: &AppProps) -> Html {
         .sidebar_panel_list_item { 
             list-style: none;
             margin-top: 0.2rem;
+            font-size: 0.9rem;
         } 
   
         .sidebar_panel_list_item::before { 
@@ -572,7 +573,11 @@ pub fn app(props: &AppProps) -> Html {
                         {join(&CONFIG.gallery.author.as_ref().map(|author| {
                             {html!{<>
                                 {"Published by "}
-                                {author}
+                                if let Some(href) = CONFIG.gallery.author_url.clone() {
+                                    <a {href}>{author}</a>
+                                } else {
+                                    {author}
+                                }
                             </>}}
                         }).into_iter()
                             .chain(std::iter::once(html!{<>
