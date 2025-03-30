@@ -16,6 +16,7 @@ use std::io::Cursor;
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
+use util::remove_dir_contents;
 use wax::Glob;
 
 mod category_path;
@@ -94,18 +95,16 @@ fn main() {
             return;
         }
 
-        let file = std::fs::read(entry.path()).unwrap();
-        let img = image::load_from_memory(&file)
-            .expect("failed to open image")
-            .to_rgb8();
+        let input_image_data = std::fs::read(entry.path()).unwrap();
 
         let mut photo = Photo {
             name: name.rsplit_once('.').unwrap().0.to_owned(),
             description: None,
-            thumbnail: generate_thumbnail(&img),
-            preview: resize_image(&img, config.preview_resolution),
-            image: resize_image(&img, config.photo_resolution),
-            exif: ExifData::load(&file),
+            exif: ExifData::load(&input_image_data),
+            input_image_data,
+            image: Default::default(),
+            preview: Default::default(),
+            thumbnail: Default::default(),
         };
 
         let mut gallery = gallery.lock().unwrap();
@@ -149,7 +148,16 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    gallery.output();
+    if fs::exists(&config.output).unwrap() {
+        remove_dir_contents(&config.output).expect("failed to clear output directory");
+    }
+
+    gallery.output(&|path, contents| {
+        if let Some((dir, _)) = path.rsplit_once('/') {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        std::fs::write(path, contents).unwrap();
+    });
 
     println!(
         "({:.1}s) Saved website to {}",

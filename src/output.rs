@@ -8,8 +8,9 @@ use crate::{
 };
 use chrono::NaiveDate;
 use core::num;
+use image::{ImageFormat, RgbImage};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::borrow::Borrow;
+use std::{borrow::Borrow, io::Cursor};
 use std::{fs, sync::Arc};
 use yew::{
     classes, function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer,
@@ -17,11 +18,8 @@ use yew::{
 };
 
 impl Gallery {
-    pub fn output(&self) {
+    pub fn output(&self, write_file: &(dyn Fn(&str, Vec<u8>) + Send + Sync)) {
         let config = &*CONFIG;
-        if fs::exists(&config.output).unwrap() {
-            remove_dir_contents(&config.output).expect("failed to clear output directory");
-        }
 
         let mut pages = Vec::new();
         /// TODO: nested pages.
@@ -33,7 +31,7 @@ impl Gallery {
             .collect::<Vec<_>>();
 
         self.visit_items(|path, item| {
-            pages.push((path.clone(), item.clone()));
+            pages.push((path.clone(), item));
         });
 
         pages.into_par_iter().for_each(|(path, item)| match item {
@@ -54,22 +52,19 @@ impl Gallery {
                     num_photos += 1;
                 }
                 let photo_index = photo_index.unwrap();
-                fs::create_dir_all(&config.subdirectory(&path.to_string_without_leading_slash()))
-                    .expect("faailed to create item directory");
-                photo
-                    .image
-                    .save(config.photo::<false>(&path, &photo.name))
-                    .unwrap();
-                photo
-                    .preview
-                    .save(config.preview::<false>(&path, &photo.name))
-                    .unwrap();
-                photo
-                    .thumbnail
-                    .save(config.thumbnail::<false>(&path, &photo.name))
-                    .unwrap();
-                render_html(
-                    AppProps {
+                let photo_path = config.photo::<false>(&path, &photo.name);
+                write_file(&photo_path, write_image(photo.image(), &photo_path));
+                let preview_path = config.preview::<false>(&path, &photo.name);
+                write_file(&preview_path, write_image(photo.preview(), &preview_path));
+                let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
+                write_file(
+                    &thumbnail_path,
+                    write_image(photo.thumbnail(), &thumbnail_path),
+                );
+
+                write_file(
+                    &config.photo_html::<false>(&path, &photo.name),
+                    render_html(AppProps {
                         gallery: self.clone(),
                         title: photo.name.clone().into(),
                         description: photo.description.clone().map(|d| d.into()),
@@ -81,8 +76,8 @@ impl Gallery {
                             >
                                 <img
                                     class="preview"
-                                    width={photo.preview.width().to_string()}
-                                    height={photo.preview.height().to_string()}
+                                    width={photo.preview().width().to_string()}
+                                    height={photo.preview().height().to_string()}
                                     alt={photo.name.clone()}
                                     src={config.preview::<true>(&path, &photo.name)}
                                 />
@@ -102,18 +97,14 @@ impl Gallery {
                                 .and_then(|i| photos.get(i))
                                 .map(|p| config.photo_html::<true>(&path, &p.name)),
                         }),
-                    },
-                    &config.photo_html::<false>(&path, &photo.name),
+                    }),
                 )
             }
             Item::Category(category) => {
                 let category_path = path.push(category.slug());
-                fs::create_dir_all(
-                    &config.subdirectory(&category_path.to_string_without_leading_slash()),
-                )
-                .expect("faailed to create item directory");
-                render_html(
-                    AppProps {
+                write_file(
+                    &config.category_html::<false>(&path, &category.slug()),
+                    render_html(AppProps {
                         gallery: self.clone(),
                         title: category.name.clone().into(),
                         description: category.description.clone().map(|d| d.into()),
@@ -122,8 +113,7 @@ impl Gallery {
                         pages: page_items.clone(),
                         path: category_path.clone(),
                         relative: None,
-                    },
-                    &config.category_html::<false>(&path, &category.slug()),
+                    }),
                 )
             }
             Item::Page(page) => {
@@ -143,11 +133,12 @@ impl Gallery {
                             .unwrap()
                             .into(),
                     ),
-                    PageFormat::Html => Html::from_html_unchecked(page.content.into()),
+                    PageFormat::Html => Html::from_html_unchecked(page.content.clone().into()),
                 };
 
-                render_html(
-                    AppProps {
+                write_file(
+                    &config.page_html::<false>(&path, &page.name),
+                    render_html(AppProps {
                         gallery: self.clone(),
                         title: page.name.clone().into(),
                         description: None,
@@ -156,14 +147,14 @@ impl Gallery {
                         pages: page_items.clone(),
                         path: path.push(page.name.clone()).clone(),
                         relative: None,
-                    },
-                    &config.page_html::<false>(&path, &page.name),
-                )
+                    }),
+                );
             }
         });
 
-        render_html(
-            AppProps {
+        write_file(
+            &CONFIG.index_html::<false>(),
+            render_html(AppProps {
                 gallery: self.clone(),
                 title: config.title.clone().into(),
                 description: CONFIG.description.clone().map(|d| d.into()),
@@ -172,9 +163,8 @@ impl Gallery {
                 pages: page_items,
                 path: CategoryPath::ROOT,
                 relative: None,
-            },
-            &CONFIG.index_html::<false>(),
-        )
+            }),
+        );
     }
 }
 
@@ -259,7 +249,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
     }
 }
 
-fn render_html(props: AppProps, path: &str) {
+fn render_html(props: AppProps) -> Vec<u8> {
     use std::ops::Deref;
     let renderer = LocalServerRenderer::<App>::with_props(props).hydratable(false);
     let html = futures::executor::block_on(renderer.render());
@@ -275,7 +265,7 @@ fn render_html(props: AppProps, path: &str) {
 
     html.insert_str(0, "<!DOCTYPE html>\n");
 
-    fs::write(path, html).expect(path);
+    html.into_bytes()
 }
 
 #[derive(Properties, PartialEq)]
@@ -324,7 +314,7 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         #page {
-            background-color: #fbfbfb;
+            background-color: white;;
             max-width: 60rem;
             margin: 0rem auto;
             display: flex;
@@ -391,6 +381,7 @@ pub fn app(props: &AppProps) -> Html {
         }
 
         #sidebar {
+            background-color: #fbfbfb;
             min-width: 18rem;
             width: 18rem;
             box-shadow: -0.25rem 0px 0.5rem 0 rgba(0, 0, 0, 0.1);
@@ -596,4 +587,11 @@ fn join<T: Clone>(slice: &[T], sep: &T) -> Vec<T> {
         result.extend_from_slice(std::slice::from_ref(v))
     }
     result
+}
+
+pub fn write_image(img: &RgbImage, path: &str) -> Vec<u8> {
+    let mut ret = Cursor::new(Vec::new());
+    img.write_to(&mut ret, ImageFormat::from_path(path).unwrap())
+        .unwrap();
+    ret.into_inner()
 }
