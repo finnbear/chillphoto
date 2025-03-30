@@ -1,57 +1,67 @@
 use serde::Deserialize;
 use std::path::Path;
 
-use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty};
+use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty, CONFIG};
 
 #[derive(Deserialize, Clone, PartialEq, Debug)]
 pub struct Config {
-    pub input: InputConfig,
-    pub gallery: GalleryConfig,
-    pub thumbnail: ThumbnailConfig,
-    pub output: OutputConfig,
-}
-
-#[derive(Deserialize, Clone, PartialEq, Debug)]
-pub struct InputConfig {
-    #[serde(default = "default_input_path")]
-    pub path: String,
-}
-
-fn default_input_path() -> String {
-    String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html}")
-}
-
-#[derive(Deserialize, Clone, PartialEq, Debug)]
-pub struct GalleryConfig {
+    #[serde(default = "default_input")]
+    pub input: String,
+    #[serde(default = "default_output")]
+    pub output: String,
     pub title: String,
     pub author: Option<String>,
     pub author_url: Option<String>,
     pub description: Option<String>,
+    #[serde(default = "default_photo_format")]
+    pub photo_format: String,
+    #[serde(default = "default_photo_resolution")]
+    pub photo_resolution: u32,
+    #[serde(default = "default_preview_format")]
+    pub preview_format: String,
+    #[serde(default = "default_preview_resolution")]
+    pub preview_resolution: u32,
+    #[serde(default = "default_thumbnail_format")]
+    pub thumbnail_format: String,
+    #[serde(default = "default_thumbnail_resolution")]
+    pub thumbnail_resolution: u32,
 }
 
-#[derive(Deserialize, Clone, PartialEq, Debug)]
-pub struct ThumbnailConfig {
-    #[serde(default = "default_thumbnail_resolution")]
-    pub resolution: u32,
+fn default_input() -> String {
+    String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html}")
+}
+
+fn default_photo_format() -> String {
+    "jpg".to_owned()
+}
+
+fn default_photo_resolution() -> u32 {
+    3840
+}
+
+fn default_preview_format() -> String {
+    "webp".to_owned()
+}
+
+fn default_preview_resolution() -> u32 {
+    1920
+}
+
+fn default_thumbnail_format() -> String {
+    "webp".to_owned()
 }
 
 fn default_thumbnail_resolution() -> u32 {
     100
 }
 
-#[derive(Deserialize, Clone, PartialEq, Debug)]
-pub struct OutputConfig {
-    #[serde(default = "default_output_path")]
-    pub path: String,
-}
-
-fn default_output_path() -> String {
+fn default_output() -> String {
     String::from("./output")
 }
 
-impl OutputConfig {
+impl Config {
     pub fn subdirectory(&self, subdirectory: &str) -> String {
-        Path::new(&self.path)
+        Path::new(&self.output)
             .join(Path::new(subdirectory))
             .to_str()
             .unwrap()
@@ -78,7 +88,11 @@ impl OutputConfig {
     }
 
     pub fn photo<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        format!("{}.jpg", self.variation::<PUBLIC>(category, name, ""))
+        format!(
+            "{}.{}",
+            self.variation::<PUBLIC>(category, name, ""),
+            CONFIG.photo_format
+        )
     }
 
     pub fn photo_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
@@ -87,15 +101,17 @@ impl OutputConfig {
 
     pub fn preview<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!(
-            "{}.webp",
-            self.variation::<PUBLIC>(category, name, "_preview")
+            "{}.{}",
+            self.variation::<PUBLIC>(category, name, "_preview"),
+            CONFIG.preview_format
         )
     }
 
     pub fn thumbnail<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!(
-            "{}.webp",
-            self.variation::<PUBLIC>(category, name, "_thumbnail")
+            "{}.{}",
+            self.variation::<PUBLIC>(category, name, "_thumbnail"),
+            CONFIG.thumbnail_format
         )
     }
 

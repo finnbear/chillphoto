@@ -2,7 +2,7 @@
 
 use category_path::CategoryPath;
 use chrono::NaiveDate;
-use config::{Config, ThumbnailConfig};
+use config::Config;
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, PageFormat};
 use image::imageops::{self, resize, FilterType};
@@ -38,7 +38,7 @@ fn main() {
     LazyLock::force(&CONFIG);
     let config = &*CONFIG;
 
-    let mut input_path_string = config.input.path.clone();
+    let mut input_path_string = config.input.clone();
     if let Some(remainder) = input_path_string.strip_prefix("~/") {
         #[allow(deprecated)]
         let home_dir = std::env::home_dir();
@@ -58,7 +58,7 @@ fn main() {
 
     let mut entries = glob
         .walk(root)
-        .not([config.output.path.as_str()])
+        .not([config.output.as_str()])
         .unwrap()
         .collect::<Vec<_>>();
 
@@ -103,8 +103,8 @@ fn main() {
             name: name.rsplit_once('.').unwrap().0.to_owned(),
             description: None,
             thumbnail: generate_thumbnail(&img),
-            preview: generate_preview(&img),
-            image: img,
+            preview: resize_image(&img, config.preview_resolution),
+            image: resize_image(&img, config.photo_resolution),
             exif: ExifData::load(&file),
         };
 
@@ -154,7 +154,7 @@ fn main() {
     println!(
         "({:.1}s) Saved website to {}",
         start.elapsed().as_secs_f32(),
-        config.output.path
+        config.output
     );
 }
 
@@ -173,14 +173,17 @@ fn generate_thumbnail(img: &RgbImage) -> RgbImage {
     let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size).to_image();
     imageops::resize(
         &cropped,
-        CONFIG.thumbnail.resolution,
-        CONFIG.thumbnail.resolution,
+        CONFIG.thumbnail_resolution,
+        CONFIG.thumbnail_resolution,
         FilterType::Lanczos3,
     )
 }
 
-fn generate_preview(img: &RgbImage) -> RgbImage {
+fn resize_image(img: &RgbImage, resolution: u32) -> RgbImage {
+    if img.width() <= resolution && img.height() <= resolution {
+        return img.clone();
+    }
     DynamicImage::ImageRgb8(img.clone())
-        .resize(1920, 1080, FilterType::Lanczos3)
+        .resize(resolution, resolution, FilterType::Lanczos3)
         .to_rgb8()
 }

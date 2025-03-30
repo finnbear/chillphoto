@@ -1,6 +1,6 @@
 use crate::{
     category_path::CategoryPath,
-    config::{Config, OutputConfig},
+    config::Config,
     gallery::{Gallery, Item, Page, PageFormat},
     photo::Photo,
     util::{add_trailing_slash_if_nonempty, remove_dir_contents},
@@ -19,8 +19,8 @@ use yew::{
 impl Gallery {
     pub fn output(&self) {
         let config = &*CONFIG;
-        if fs::exists(&config.output.path).unwrap() {
-            remove_dir_contents(&config.output.path).expect("failed to clear output directory");
+        if fs::exists(&config.output).unwrap() {
+            remove_dir_contents(&config.output).expect("failed to clear output directory");
         }
 
         let mut pages = Vec::new();
@@ -29,14 +29,7 @@ impl Gallery {
             .children
             .iter()
             .filter_map(|i| i.page().cloned())
-            .map(|p| {
-                (
-                    config
-                        .output
-                        .page_html::<true>(&CategoryPath::ROOT, &p.name),
-                    p,
-                )
-            })
+            .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
             .collect::<Vec<_>>();
 
         self.visit_items(|path, item| {
@@ -61,23 +54,19 @@ impl Gallery {
                     num_photos += 1;
                 }
                 let photo_index = photo_index.unwrap();
-                fs::create_dir_all(
-                    &config
-                        .output
-                        .subdirectory(&path.to_string_without_leading_slash()),
-                )
-                .expect("faailed to create item directory");
+                fs::create_dir_all(&config.subdirectory(&path.to_string_without_leading_slash()))
+                    .expect("faailed to create item directory");
                 photo
                     .image
-                    .save(config.output.photo::<false>(&path, &photo.name))
+                    .save(config.photo::<false>(&path, &photo.name))
                     .unwrap();
                 photo
                     .preview
-                    .save(config.output.preview::<false>(&path, &photo.name))
+                    .save(config.preview::<false>(&path, &photo.name))
                     .unwrap();
                 photo
                     .thumbnail
-                    .save(config.output.thumbnail::<false>(&path, &photo.name))
+                    .save(config.thumbnail::<false>(&path, &photo.name))
                     .unwrap();
                 render_html(
                     AppProps {
@@ -88,14 +77,14 @@ impl Gallery {
                         body: html! {
                             <a
                                 class="preview_container"
-                                href={config.output.photo::<true>(&path, &photo.name)}
+                                href={config.photo::<true>(&path, &photo.name)}
                             >
                                 <img
                                     class="preview"
                                     width={photo.preview.width().to_string()}
                                     height={photo.preview.height().to_string()}
                                     alt={photo.name.clone()}
-                                    src={config.output.preview::<true>(&path, &photo.name)}
+                                    src={config.preview::<true>(&path, &photo.name)}
                                 />
                             </a>
                         },
@@ -107,22 +96,20 @@ impl Gallery {
                             previous: photo_index
                                 .checked_sub(1)
                                 .and_then(|i| photos.get(i))
-                                .map(|p| config.output.photo_html::<true>(&path, &p.name)),
+                                .map(|p| config.photo_html::<true>(&path, &p.name)),
                             next: photo_index
                                 .checked_add(1)
                                 .and_then(|i| photos.get(i))
-                                .map(|p| config.output.photo_html::<true>(&path, &p.name)),
+                                .map(|p| config.photo_html::<true>(&path, &p.name)),
                         }),
                     },
-                    &config.output.photo_html::<false>(&path, &photo.name),
+                    &config.photo_html::<false>(&path, &photo.name),
                 )
             }
             Item::Category(category) => {
                 let category_path = path.push(category.slug());
                 fs::create_dir_all(
-                    &config
-                        .output
-                        .subdirectory(&category_path.to_string_without_leading_slash()),
+                    &config.subdirectory(&category_path.to_string_without_leading_slash()),
                 )
                 .expect("faailed to create item directory");
                 render_html(
@@ -136,9 +123,7 @@ impl Gallery {
                         path: category_path.clone(),
                         relative: None,
                     },
-                    &config
-                        .output
-                        .category_html::<false>(&path, &category.slug()),
+                    &config.category_html::<false>(&path, &category.slug()),
                 )
             }
             Item::Page(page) => {
@@ -172,7 +157,7 @@ impl Gallery {
                         path: path.push(page.name.clone()).clone(),
                         relative: None,
                     },
-                    &config.output.page_html::<false>(&path, &page.name),
+                    &config.page_html::<false>(&path, &page.name),
                 )
             }
         });
@@ -180,15 +165,15 @@ impl Gallery {
         render_html(
             AppProps {
                 gallery: self.clone(),
-                title: config.gallery.title.clone().into(),
-                description: CONFIG.gallery.description.clone().map(|d| d.into()),
+                title: config.title.clone().into(),
+                description: CONFIG.description.clone().map(|d| d.into()),
                 head: Default::default(),
                 body: render_items(&CategoryPath::ROOT, &self.children),
                 pages: page_items,
                 path: CategoryPath::ROOT,
                 relative: None,
             },
-            &CONFIG.output.index_html::<false>(),
+            &CONFIG.index_html::<false>(),
         )
     }
 }
@@ -209,15 +194,15 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                     Some(html!{
                         <a
                             class="thumbnail_container"
-                            href={CONFIG.output.photo_html::<true>(&category_path, &photo.name)}
+                            href={CONFIG.photo_html::<true>(&category_path, &photo.name)}
                         >
                             <img
                                 alt={photo.name.clone()}
-                                src={CONFIG.output.thumbnail::<true>(&category_path, &photo.name)}
+                                src={CONFIG.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
                                     "width: {}; height: {};",
-                                    CONFIG.thumbnail.resolution,
-                                    CONFIG.thumbnail.resolution
+                                    CONFIG.thumbnail_resolution,
+                                    CONFIG.thumbnail_resolution
                                 )}
                                 class="thumbnail"
                             />
@@ -238,17 +223,17 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                     Some(html!{
                         <a
                             class="thumbnail_container category_item"
-                            href={CONFIG.output.category_html::<true>(&category_path, &category.slug())}
+                            href={CONFIG.category_html::<true>(&category_path, &category.slug())}
                         >
                             <img
                                 class="thumbnail"
                                 style={format!(
                                     "width: {}; height: {};",
-                                    CONFIG.thumbnail.resolution,
-                                    CONFIG.thumbnail.resolution
+                                    CONFIG.thumbnail_resolution,
+                                    CONFIG.thumbnail_resolution
                                 )}
                                 alt={photo.name.clone()}
-                                src={CONFIG.output.thumbnail::<true>(&photo_path, &photo.name)}
+                                src={CONFIG.thumbnail::<true>(&photo_path, &photo.name)}
                             />
                             <div class="category_item_info">
                                 <h2 class="category_item_name">
@@ -496,7 +481,7 @@ pub fn app(props: &AppProps) -> Html {
                 if let Some(description) = props.description.clone() {
                     <meta name="description" content={description}/>
                 }
-                if let Some(author) = CONFIG.gallery.author.clone() {
+                if let Some(author) = CONFIG.author.clone() {
                     <meta name="author" content={author}/>
                 }
                 <meta name="generator" content="chillphoto"/>
@@ -508,7 +493,7 @@ pub fn app(props: &AppProps) -> Html {
             <body>
                 <div id="page">
                     <header id="header">
-                        <h1 id="title">{CONFIG.gallery.title.clone()}</h1>
+                        <h1 id="title">{CONFIG.title.clone()}</h1>
                         if let Some(relative) = &props.relative {
                             <div id="relative_navigation">
                                 <a
@@ -570,10 +555,10 @@ pub fn app(props: &AppProps) -> Html {
                         </aside>
                     </div>
                     <footer id="footer">
-                        {join(&CONFIG.gallery.author.as_ref().map(|author| {
+                        {join(&CONFIG.author.as_ref().map(|author| {
                             {html!{<>
                                 {"Published by "}
-                                if let Some(href) = CONFIG.gallery.author_url.clone() {
+                                if let Some(href) = CONFIG.author_url.clone() {
                                     <a {href}>{author}</a>
                                 } else {
                                     {author}
