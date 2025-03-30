@@ -5,6 +5,8 @@ use std::io::Cursor;
 /// https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExifData {
+    pub width: Option<String>,
+    pub height: Option<String>,
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,
     pub lens_make: Option<String>,
@@ -23,6 +25,16 @@ pub struct ExifData {
 }
 
 impl ExifData {
+    pub fn dimensions(&self) -> Option<(u32, u32)> {
+        fn parse_pixels(s: &str) -> Option<u32> {
+            s.split(' ').next().and_then(|s| s.parse::<u32>().ok())
+        }
+        self.width
+            .as_deref()
+            .zip(self.height.as_deref())
+            .and_then(|(w, h)| parse_pixels(w).zip(parse_pixels(h)))
+    }
+
     pub fn date(&self) -> Option<NaiveDate> {
         self.original_time_taken
             .as_ref()
@@ -54,6 +66,8 @@ impl ExifData {
         }
 
         Self {
+            width: lookup(&meta, Tag::PixelXDimension).or_else(|| lookup(&meta, Tag::ImageWidth)),
+            height: lookup(&meta, Tag::PixelYDimension).or_else(|| lookup(&meta, Tag::ImageLength)),
             camera_make: lookup(&meta, Tag::Make),
             camera_model: lookup(&meta, Tag::Model),
             lens_make: lookup(&meta, Tag::LensMake),

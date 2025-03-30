@@ -148,11 +148,19 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
+    let output = gallery.output();
+
+    println!(
+        "({:.1}s) Generated output manifest",
+        start.elapsed().as_secs_f32(),
+    );
+
     if fs::exists(&config.output).unwrap() {
         remove_dir_contents(&config.output).expect("failed to clear output directory");
     }
 
-    gallery.output(&|path, contents| {
+    output.into_par_iter().for_each(|(path, generator)| {
+        let contents = generator();
         if let Some((dir, _)) = path.rsplit_once('/') {
             std::fs::create_dir_all(dir).unwrap();
         }
@@ -171,27 +179,4 @@ fn is_text_file(path: &Path) -> bool {
         Some(ext) => matches!(ext.to_lowercase().as_str(), "txt"),
         None => false,
     }
-}
-
-fn generate_thumbnail(img: &RgbImage) -> RgbImage {
-    let (width, height) = img.dimensions();
-    let size = width.min(height);
-    let x_offset = (width - size) / 2;
-    let y_offset = (height - size) / 2;
-    let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size).to_image();
-    imageops::resize(
-        &cropped,
-        CONFIG.thumbnail_resolution,
-        CONFIG.thumbnail_resolution,
-        FilterType::Lanczos3,
-    )
-}
-
-fn resize_image(img: &RgbImage, resolution: u32) -> RgbImage {
-    if img.width() <= resolution && img.height() <= resolution {
-        return img.clone();
-    }
-    DynamicImage::ImageRgb8(img.clone())
-        .resize(resolution, resolution, FilterType::Lanczos3)
-        .to_rgb8()
 }

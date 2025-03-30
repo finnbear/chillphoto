@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use core::num;
 use image::{ImageFormat, RgbImage};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{borrow::Borrow, io::Cursor};
+use std::{borrow::Borrow, collections::HashMap, io::Cursor, sync::Mutex};
 use std::{fs, sync::Arc};
 use yew::{
     classes, function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer,
@@ -18,10 +18,11 @@ use yew::{
 };
 
 impl Gallery {
-    pub fn output(&self, write_file: &(dyn Fn(&str, Vec<u8>) + Send + Sync)) {
+    pub fn output<'a>(
+        &'a self,
+    ) -> HashMap<String, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>> {
         let config = &*CONFIG;
 
-        let mut pages = Vec::new();
         /// TODO: nested pages.
         let page_items = self
             .children
@@ -30,11 +31,9 @@ impl Gallery {
             .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
             .collect::<Vec<_>>();
 
-        self.visit_items(|path, item| {
-            pages.push((path.clone(), item));
-        });
+        let mut ret = HashMap::<String, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>::new();
 
-        pages.into_par_iter().for_each(|(path, item)| match item {
+        self.visit_items(|path, item| match item {
             Item::Photo(photo) => {
                 let mut num_photos = 0usize;
                 let mut photo_index = Option::<usize>::None;
@@ -53,68 +52,76 @@ impl Gallery {
                 }
                 let photo_index = photo_index.unwrap();
                 let photo_path = config.photo::<false>(&path, &photo.name);
-                write_file(&photo_path, write_image(photo.image(), &photo_path));
+                ret.insert(
+                    photo_path.clone(),
+                    Box::new(move || write_image(photo.image(), &photo_path)),
+                );
                 let preview_path = config.preview::<false>(&path, &photo.name);
-                write_file(&preview_path, write_image(photo.preview(), &preview_path));
+                ret.insert(
+                    preview_path.clone(),
+                    Box::new(move || write_image(photo.preview(), &preview_path)),
+                );
                 let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
-                write_file(
-                    &thumbnail_path,
-                    write_image(photo.thumbnail(), &thumbnail_path),
+                ret.insert(
+                    thumbnail_path.clone(),
+                    Box::new(move || write_image(photo.thumbnail(), &thumbnail_path)),
                 );
 
-                write_file(
-                    &config.photo_html::<false>(&path, &photo.name),
-                    render_html(AppProps {
-                        gallery: self.clone(),
-                        title: photo.name.clone().into(),
-                        description: photo.description.clone().map(|d| d.into()),
-                        head: Default::default(),
-                        body: html! {
-                            <a
-                                class="preview_container"
-                                href={config.photo::<true>(&path, &photo.name)}
-                            >
-                                <img
-                                    class="preview"
-                                    width={photo.preview().width().to_string()}
-                                    height={photo.preview().height().to_string()}
-                                    alt={photo.name.clone()}
-                                    src={config.preview::<true>(&path, &photo.name)}
-                                />
-                            </a>
-                        },
-                        pages: page_items.clone(),
-                        path: path.push(photo.name.clone()).clone(),
-                        relative: Some(RelativeNavigation {
-                            index: photo_index,
-                            count: num_photos,
-                            previous: photo_index
-                                .checked_sub(1)
-                                .and_then(|i| photos.get(i))
-                                .map(|p| config.photo_html::<true>(&path, &p.name)),
-                            next: photo_index
-                                .checked_add(1)
-                                .and_then(|i| photos.get(i))
-                                .map(|p| config.photo_html::<true>(&path, &p.name)),
-                        }),
+                let contents = render_html(AppProps {
+                    gallery: self.clone(),
+                    title: photo.name.clone().into(),
+                    description: photo.description.clone().map(|d| d.into()),
+                    head: Default::default(),
+                    body: html! {
+                        <a
+                            class="preview_container"
+                            href={config.photo::<true>(&path, &photo.name)}
+                        >
+                            <img
+                                class="preview"
+                                width={photo.preview_dimensions().0.to_string()}
+                                height={photo.preview_dimensions().1.to_string()}
+                                alt={photo.name.clone()}
+                                src={config.preview::<true>(&path, &photo.name)}
+                            />
+                        </a>
+                    },
+                    pages: page_items.clone(),
+                    path: path.push(photo.name.clone()).clone(),
+                    relative: Some(RelativeNavigation {
+                        index: photo_index,
+                        count: num_photos,
+                        previous: photo_index
+                            .checked_sub(1)
+                            .and_then(|i| photos.get(i))
+                            .map(|p| config.photo_html::<true>(&path, &p.name)),
+                        next: photo_index
+                            .checked_add(1)
+                            .and_then(|i| photos.get(i))
+                            .map(|p| config.photo_html::<true>(&path, &p.name)),
                     }),
-                )
+                });
+                ret.insert(
+                    config.photo_html::<false>(&path, &photo.name),
+                    Box::new(move || contents),
+                );
             }
             Item::Category(category) => {
                 let category_path = path.push(category.slug());
-                write_file(
-                    &config.category_html::<false>(&path, &category.slug()),
-                    render_html(AppProps {
-                        gallery: self.clone(),
-                        title: category.name.clone().into(),
-                        description: category.description.clone().map(|d| d.into()),
-                        head: Default::default(),
-                        body: render_items(&category_path, &category.children),
-                        pages: page_items.clone(),
-                        path: category_path.clone(),
-                        relative: None,
-                    }),
-                )
+                let contents = render_html(AppProps {
+                    gallery: self.clone(),
+                    title: category.name.clone().into(),
+                    description: category.description.clone().map(|d| d.into()),
+                    head: Default::default(),
+                    body: render_items(&category_path, &category.children),
+                    pages: page_items.clone(),
+                    path: category_path.clone(),
+                    relative: None,
+                });
+                ret.insert(
+                    config.category_html::<false>(&path, &category.slug()),
+                    Box::new(move || contents),
+                );
             }
             Item::Page(page) => {
                 let body = match page.format {
@@ -136,35 +143,36 @@ impl Gallery {
                     PageFormat::Html => Html::from_html_unchecked(page.content.clone().into()),
                 };
 
-                write_file(
-                    &config.page_html::<false>(&path, &page.name),
-                    render_html(AppProps {
-                        gallery: self.clone(),
-                        title: page.name.clone().into(),
-                        description: None,
-                        head: Default::default(),
-                        body,
-                        pages: page_items.clone(),
-                        path: path.push(page.name.clone()).clone(),
-                        relative: None,
-                    }),
+                let contents = render_html(AppProps {
+                    gallery: self.clone(),
+                    title: page.name.clone().into(),
+                    description: None,
+                    head: Default::default(),
+                    body,
+                    pages: page_items.clone(),
+                    path: path.push(page.name.clone()).clone(),
+                    relative: None,
+                });
+                ret.insert(
+                    config.page_html::<false>(&path, &page.name),
+                    Box::new(move || contents),
                 );
             }
         });
 
-        write_file(
-            &CONFIG.index_html::<false>(),
-            render_html(AppProps {
-                gallery: self.clone(),
-                title: config.title.clone().into(),
-                description: CONFIG.description.clone().map(|d| d.into()),
-                head: Default::default(),
-                body: render_items(&CategoryPath::ROOT, &self.children),
-                pages: page_items,
-                path: CategoryPath::ROOT,
-                relative: None,
-            }),
-        );
+        let contents = render_html(AppProps {
+            gallery: self.clone(),
+            title: config.title.clone().into(),
+            description: CONFIG.description.clone().map(|d| d.into()),
+            head: Default::default(),
+            body: render_items(&CategoryPath::ROOT, &self.children),
+            pages: page_items,
+            path: CategoryPath::ROOT,
+            relative: None,
+        });
+        ret.insert(CONFIG.index_html::<false>(), Box::new(move || contents));
+
+        ret
     }
 }
 
