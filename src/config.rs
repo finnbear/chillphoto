@@ -80,7 +80,7 @@ impl Config {
             .unwrap_or((name, String::new()));
         let category = add_trailing_slash_if_nonempty(&category.to_string_without_leading_slash());
         let path = format!("{category}{name}{variation}{extension}");
-        if PUBLIC {
+        if true || PUBLIC {
             format!("/{path}")
         } else {
             self.subdirectory(&path)

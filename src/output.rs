@@ -10,7 +10,12 @@ use chrono::NaiveDate;
 use core::num;
 use image::{ImageFormat, RgbImage};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{borrow::Borrow, collections::HashMap, io::Cursor, sync::Mutex};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    io::Cursor,
+    sync::{LazyLock, Mutex},
+};
 use std::{fs, sync::Arc};
 use yew::{
     classes, function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer,
@@ -20,7 +25,7 @@ use yew::{
 impl Gallery {
     pub fn output<'a>(
         &'a self,
-    ) -> HashMap<String, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>> {
+    ) -> HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>> {
         let config = &*CONFIG;
 
         /// TODO: nested pages.
@@ -31,7 +36,10 @@ impl Gallery {
             .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
             .collect::<Vec<_>>();
 
-        let mut ret = HashMap::<String, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>::new();
+        let mut ret = HashMap::<
+            String,
+            LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
+        >::new();
 
         self.visit_items(|path, item| match item {
             Item::Photo(photo) => {
@@ -54,17 +62,21 @@ impl Gallery {
                 let photo_path = config.photo::<false>(&path, &photo.name);
                 ret.insert(
                     photo_path.clone(),
-                    Box::new(move || write_image(photo.image(), &photo_path)),
+                    LazyLock::new(Box::new(move || write_image(photo.image(), &photo_path))),
                 );
                 let preview_path = config.preview::<false>(&path, &photo.name);
                 ret.insert(
                     preview_path.clone(),
-                    Box::new(move || write_image(photo.preview(), &preview_path)),
+                    LazyLock::new(Box::new(move || {
+                        write_image(photo.preview(), &preview_path)
+                    })),
                 );
                 let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
                 ret.insert(
                     thumbnail_path.clone(),
-                    Box::new(move || write_image(photo.thumbnail(), &thumbnail_path)),
+                    LazyLock::new(Box::new(move || {
+                        write_image(photo.thumbnail(), &thumbnail_path)
+                    })),
                 );
 
                 let contents = render_html(AppProps {
@@ -103,7 +115,7 @@ impl Gallery {
                 });
                 ret.insert(
                     config.photo_html::<false>(&path, &photo.name),
-                    Box::new(move || contents),
+                    LazyLock::new(Box::new(move || contents)),
                 );
             }
             Item::Category(category) => {
@@ -120,7 +132,7 @@ impl Gallery {
                 });
                 ret.insert(
                     config.category_html::<false>(&path, &category.slug()),
-                    Box::new(move || contents),
+                    LazyLock::new(Box::new(move || contents)),
                 );
             }
             Item::Page(page) => {
@@ -155,7 +167,7 @@ impl Gallery {
                 });
                 ret.insert(
                     config.page_html::<false>(&path, &page.name),
-                    Box::new(move || contents),
+                    LazyLock::new(Box::new(move || contents)),
                 );
             }
         });
@@ -170,7 +182,10 @@ impl Gallery {
             path: CategoryPath::ROOT,
             relative: None,
         });
-        ret.insert(CONFIG.index_html::<false>(), Box::new(move || contents));
+        ret.insert(
+            CONFIG.index_html::<false>(),
+            LazyLock::new(Box::new(move || contents)),
+        );
 
         ret
     }

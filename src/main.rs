@@ -5,6 +5,9 @@ use chrono::NaiveDate;
 use config::Config;
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, PageFormat};
+use http::request::Parts;
+use http::{Extensions, HeaderMap, HeaderName, HeaderValue, Method, Uri, Version};
+use httparse::Status;
 use image::imageops::{self, resize, FilterType};
 use image::{DynamicImage, GenericImageView, RgbImage};
 use photo::Photo;
@@ -12,9 +15,11 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs;
-use std::io::Cursor;
+use std::io::Write;
+use std::io::{Cursor, Read};
 use std::path::Path;
-use std::sync::{LazyLock, Mutex};
+use std::str::FromStr;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 use util::remove_dir_contents;
 use wax::Glob;
@@ -159,13 +164,113 @@ fn main() {
         remove_dir_contents(&config.output).expect("failed to clear output directory");
     }
 
+    let output = &output;
+    std::thread::scope(|scope| {
+        let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
+
+        loop {
+            let mut stream = if let Ok((stream, _)) = listener.accept() {
+                stream
+            } else {
+                continue;
+            };
+            scope.spawn(move || {
+                let mut buf = Vec::new();
+
+                let (request, body) = loop {
+                    let mut tmp = [0u8; 1024];
+                    match stream.read(&mut tmp) {
+                        Ok(0) => return,
+                        Ok(n) => {
+                            buf.extend_from_slice(&tmp[0..n]);
+                        }
+                        Err(_) => {
+                            return;
+                        }
+                    };
+
+                    let mut headers = [httparse::EMPTY_HEADER; 16];
+                    let mut parse_req = httparse::Request::new(&mut headers);
+                    let res = parse_req.parse(&buf).unwrap();
+                    if let Status::Complete(body) = res {
+                        let method = if let Some(method) =
+                            parse_req.method.and_then(|m| Method::from_str(m).ok())
+                        {
+                            method
+                        } else {
+                            return;
+                        };
+                        let uri =
+                            if let Some(uri) = parse_req.path.and_then(|p| Uri::from_str(p).ok()) {
+                                uri
+                            } else {
+                                return;
+                            };
+                        let headers = HeaderMap::new();
+
+                        let mut builder = http::Request::builder().method(method).uri(uri).version(
+                            if parse_req.version == Some(1) {
+                                Version::HTTP_11
+                            } else {
+                                Version::HTTP_10
+                            },
+                        );
+                        for header in parse_req.headers {
+                            builder = builder.header(header.name, header.value);
+                        }
+                        let request = builder.body(Vec::<u8>::new()).unwrap();
+
+                        break (request, body);
+                    }
+                };
+
+                println!("{request:?}");
+
+                let response_body = if let Some(file) = output.get(request.uri().path()) {
+                    (&***file).to_vec()
+                } else {
+                    b"not found".to_vec()
+                };
+
+                let response = http::Response::builder()
+                    .version(request.version())
+                    .status(200)
+                    .body(response_body)
+                    .unwrap();
+
+                let status_line = format!(
+                    "{:?} {} {}\r\n",
+                    response.version(),
+                    response.status().as_u16(),
+                    response.status().canonical_reason().unwrap()
+                );
+
+                let mut headers = String::new();
+                for (name, value) in response.headers() {
+                    headers.push_str(&format!("{}: {}\r\n", name, value.to_str().unwrap_or("")));
+                }
+
+                let body: &[u8] = response.body().as_ref();
+                let content_length = body.len();
+                headers.push_str(&format!("Content-Length: {}\r\n\r\n", content_length));
+
+                stream.write_all(status_line.as_bytes()).unwrap();
+                stream.write_all(headers.as_bytes()).unwrap();
+                stream.write_all(body).unwrap();
+                stream.flush().unwrap();
+            });
+        }
+    });
+
+    /*
     output.into_par_iter().for_each(|(path, generator)| {
-        let contents = generator();
+        let contents = &*generator;
         if let Some((dir, _)) = path.rsplit_once('/') {
             std::fs::create_dir_all(dir).unwrap();
         }
         std::fs::write(path, contents).unwrap();
     });
+    */
 
     println!(
         "({:.1}s) Saved website to {}",
