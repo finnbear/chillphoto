@@ -5,7 +5,7 @@ use image::{
 };
 use std::{fmt::Debug, sync::OnceLock};
 
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct Photo {
     pub name: String,
     pub description: Option<String>,

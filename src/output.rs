@@ -32,7 +32,7 @@ impl Gallery {
         let page_items = self
             .children
             .iter()
-            .filter_map(|i| i.page().cloned())
+            .filter_map(|i| i.page())
             .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
             .collect::<Vec<_>>();
 
@@ -86,7 +86,7 @@ impl Gallery {
                         config.photo_html::<false>(&path, &photo.name),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
-                                gallery: self.clone(),
+                                gallery: self,
                                 title: photo.name.clone().into(),
                                 description: photo.description.clone().map(|d| d.into()),
                                 head: Default::default(),
@@ -129,7 +129,7 @@ impl Gallery {
                         config.category_html::<false>(&path, &category.slug()),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
-                                gallery: self.clone(),
+                                gallery: self,
                                 title: category.name.clone().into(),
                                 description: category.description.clone().map(|d| d.into()),
                                 head: Default::default(),
@@ -170,7 +170,7 @@ impl Gallery {
                                 }
                             };
                             render_html(AppProps {
-                                gallery: self.clone(),
+                                gallery: self,
                                 title: page.name.clone().into(),
                                 description: None,
                                 head: Default::default(),
@@ -189,7 +189,7 @@ impl Gallery {
             CONFIG.index_html::<false>(),
             LazyLock::new(Box::new(move || {
                 render_html(AppProps {
-                    gallery: self.clone(),
+                    gallery: self,
                     title: config.title.clone().into(),
                     description: CONFIG.description.clone().map(|d| d.into()),
                     head: Default::default(),
@@ -237,13 +237,13 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                     })
                 }
                 Item::Category(category) => {
-                    let mut representative = Option::<(CategoryPath, Photo)>::None;
+                    let mut representative = Option::<(CategoryPath, &Photo)>::None;
                     category.visit_items(&category_path, |path, item| {
                         if representative.is_some() {
                             return;
                         }
                         if let Item::Photo(photo) = item {
-                            representative = Some((path.clone(), photo.clone()));
+                            representative = Some((path.clone(), photo));
                         }
                     });
                     let (photo_path, photo) = representative.unwrap();
@@ -287,9 +287,22 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
 }
 
 // Takes around 10ms.
-fn render_html(props: AppProps) -> Vec<u8> {
+fn render_html(props: AppProps<'_>) -> Vec<u8> {
+    let html = app(props);
+
+    #[derive(Properties, PartialEq)]
+    struct InnerAppProps {
+        html: Html,
+    }
+
+    #[function_component(InnerApp)]
+    fn inner_app(props: &InnerAppProps) -> Html {
+        props.html.clone()
+    }
+
     use std::ops::Deref;
-    let renderer = LocalServerRenderer::<App>::with_props(props).hydratable(false);
+    let renderer =
+        LocalServerRenderer::<InnerApp>::with_props(InnerAppProps { html }).hydratable(false);
     let html = futures::executor::block_on(renderer.render());
 
     let mut options = markup_fmt::config::FormatOptions::default();
@@ -306,23 +319,18 @@ fn render_html(props: AppProps) -> Vec<u8> {
     html.into_bytes()
 }
 
-#[derive(Properties, PartialEq)]
-pub struct AppProps {
-    pub gallery: Gallery,
+pub struct AppProps<'a> {
+    pub gallery: &'a Gallery,
     pub path: CategoryPath,
-    #[prop_or("chillphoto".into())]
     pub title: AttrValue,
-    #[prop_or(None)]
     pub description: Option<AttrValue>,
-    #[prop_or_default]
     pub head: Html,
     pub body: Html,
-    pub pages: Vec<(String, Page)>,
+    pub pages: Vec<(String, &'a Page)>,
     pub relative: Option<RelativeNavigation>,
 }
 
-#[function_component(App)]
-pub fn app(props: &AppProps) -> Html {
+pub fn app(props: AppProps<'_>) -> Html {
     let style = Html::from_html_unchecked(
         r#"
         :root {
