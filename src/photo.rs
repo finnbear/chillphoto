@@ -1,9 +1,10 @@
 use crate::{config::PhotoConfig, exif::ExifData, gallery::RichText, CONFIG};
+use chrono::{DateTime, NaiveDate};
 use image::{
     imageops::{self, FilterType},
     RgbImage,
 };
-use std::{fmt::Debug, sync::OnceLock};
+use std::{fmt::Debug, sync::OnceLock, time::SystemTime};
 
 pub struct Photo {
     pub name: String,
@@ -13,10 +14,24 @@ pub struct Photo {
     pub preview: OnceLock<RgbImage>,
     pub thumbnail: OnceLock<RgbImage>,
     pub exif: ExifData,
+    pub file_date: Option<SystemTime>,
     pub config: PhotoConfig,
 }
 
 impl Photo {
+    pub fn date(&self) -> Option<NaiveDate> {
+        self.exif.date().or_else(|| {
+            self.file_date.and_then(|fd| {
+                DateTime::from_timestamp_millis(
+                    fd.duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as i64,
+                )
+                .map(|dt| dt.naive_local().date())
+            })
+        })
+    }
+
     pub fn image_dimensions(&self) -> (u32, u32) {
         if let Some((width, height)) = self.exif.dimensions() {
             // Avoid decoding the image if we don't have to.

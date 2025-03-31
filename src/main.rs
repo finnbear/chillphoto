@@ -121,7 +121,8 @@ fn main() {
             return;
         }
 
-        let input_image_data = std::fs::read(entry.path()).unwrap();
+        let metadata = fs::metadata(entry.path()).unwrap();
+        let input_image_data = fs::read(entry.path()).unwrap();
 
         let mut gallery = gallery.lock().unwrap();
         if categories.is_root() && name_no_extension == "favicon" {
@@ -138,6 +139,7 @@ fn main() {
             preview: Default::default(),
             thumbnail: Default::default(),
             config: Default::default(),
+            file_date: metadata.modified().or(metadata.created()).ok(),
         };
 
         let to_insert = gallery.gallery.get_or_create_category(&categories);
@@ -185,7 +187,7 @@ fn main() {
 
             category.visit_items(&CategoryPath::ROOT, |_, child| {
                 if let Item::Photo(photo) = child {
-                    if let Some(date) = photo.exif.date() {
+                    if let Some(date) = photo.date() {
                         if first_date.map(|fd| date < fd).unwrap_or(true) {
                             first_date = Some(date);
                         }
