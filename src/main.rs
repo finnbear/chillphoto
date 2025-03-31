@@ -1,28 +1,15 @@
-#![allow(unused)]
-
 use category_path::CategoryPath;
 use chrono::NaiveDate;
+use clap::Parser;
 use config::Config;
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, PageFormat};
-use http::request::Parts;
-use http::{Extensions, HeaderMap, HeaderName, HeaderValue, Method, Uri, Version};
-use httparse::Status;
-use image::imageops::{self, resize, FilterType};
-use image::{DynamicImage, GenericImageView, RgbImage};
 use photo::Photo;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
-use std::collections::HashMap;
-use std::fmt::Debug;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serve::serve;
 use std::fs;
-use std::io::Write;
-use std::io::{Cursor, Read};
-use std::path::Path;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, LazyLock, Mutex};
-use std::thread::available_parallelism;
-use std::time::{Duration, Instant};
+use std::sync::{LazyLock, Mutex};
+use std::time::Instant;
 use util::remove_dir_contents;
 use wax::Glob;
 
@@ -32,6 +19,7 @@ mod exif;
 mod gallery;
 mod output;
 mod photo;
+mod serve;
 mod util;
 
 pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
@@ -39,6 +27,12 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
         fs::read_to_string("./chillphoto.toml").expect("couldn't read ./chillphoto.toml");
     toml::from_str::<Config>(&config_text).unwrap()
 });
+
+#[derive(Parser)]
+struct Args {
+    #[clap(long)]
+    serve: bool,
+}
 
 fn main() {
     let start = Instant::now();
@@ -64,7 +58,7 @@ fn main() {
         children: Vec::new(),
     });
 
-    let mut entries = glob
+    let entries = glob
         .walk(root)
         .not([config.output.as_str()])
         .unwrap()
@@ -92,7 +86,7 @@ fn main() {
         if let Some(format) = page_format {
             let file = std::fs::read_to_string(entry.path()).unwrap();
             let mut gallery = gallery.lock().unwrap();
-            let mut to_insert = gallery.get_or_create_category(&categories);
+            let to_insert = gallery.get_or_create_category(&categories);
             to_insert.push(Item::Page(Page {
                 name: name.rsplit_once('.').unwrap().0.to_owned(),
                 description: None,
@@ -104,7 +98,7 @@ fn main() {
 
         let input_image_data = std::fs::read(entry.path()).unwrap();
 
-        let mut photo = Photo {
+        let photo = Photo {
             name: name.rsplit_once('.').unwrap().0.to_owned(),
             description: None,
             exif: ExifData::load(&input_image_data),
@@ -115,7 +109,7 @@ fn main() {
         };
 
         let mut gallery = gallery.lock().unwrap();
-        let mut to_insert = gallery.get_or_create_category(&categories);
+        let to_insert = gallery.get_or_create_category(&categories);
         to_insert.push(Item::Photo(photo));
     });
 
@@ -155,183 +149,33 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    let output = &gallery.output();
+    let output = gallery.output();
 
     println!(
         "({:.1}s) Generated output manifest",
         start.elapsed().as_secs_f32(),
     );
 
-    if fs::exists(&config.output).unwrap() {
-        remove_dir_contents(&config.output).expect("failed to clear output directory");
-    }
-
-    let http_threads = &AtomicUsize::new(0);
-    let http_idle = &Condvar::new();
-    let mut queue = output.iter().collect::<Vec<_>>();
-    queue.sort_by_key(|(path, _)| !path.contains("_thumbnail"));
-    let work = &Mutex::new(queue.iter());
-    std::thread::scope(|scope| {
-        // Background initialization.
-        let cpus = available_parallelism().map(|n| n.get()).unwrap_or(1);
-        for thread in 0..cpus {
-            scope.spawn(move || {
-                while let Some((path, i)) = {
-                    let next = work.lock().unwrap().next();
-                    next
-                } {
-                    LazyLock::force(i);
-                    println!("[background] {path}");
-                    while http_threads.load(Ordering::SeqCst) > thread {
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                }
-            });
+    if Args::parse().serve {
+        serve(&output);
+    } else {
+        if fs::exists(&config.output).unwrap() {
+            remove_dir_contents(&config.output).expect("failed to clear output directory");
         }
 
-        let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
+        output.par_iter().for_each(|(path, generator)| {
+            let path = config.subdirectory(path.strip_prefix('/').unwrap());
+            let contents = &**generator;
+            if let Some((dir, _)) = path.rsplit_once('/') {
+                std::fs::create_dir_all(dir).unwrap();
+            }
+            std::fs::write(path, contents).unwrap();
+        });
 
-        loop {
-            let mut stream = if let Ok((stream, _)) = listener.accept() {
-                stream
-            } else {
-                continue;
-            };
-            scope.spawn(move || {
-                struct Guard<'a>(&'a AtomicUsize);
-
-                http_threads.fetch_add(1, Ordering::SeqCst);
-
-                impl<'a> Drop for Guard<'a> {
-                    fn drop(&mut self) {
-                        self.0.fetch_sub(1, Ordering::SeqCst);
-                    }
-                }
-
-                let _guard = Guard(http_threads);
-
-                let mut buf = Vec::new();
-
-                let (request, body) = loop {
-                    let mut tmp = [0u8; 1024];
-                    match stream.read(&mut tmp) {
-                        Ok(0) => return,
-                        Ok(n) => {
-                            buf.extend_from_slice(&tmp[0..n]);
-                        }
-                        Err(_) => {
-                            return;
-                        }
-                    };
-
-                    let mut headers = [httparse::EMPTY_HEADER; 128];
-                    let mut parse_req = httparse::Request::new(&mut headers);
-                    let res = parse_req.parse(&buf).unwrap();
-                    if let Status::Complete(body) = res {
-                        let method = if let Some(method) =
-                            parse_req.method.and_then(|m| Method::from_str(m).ok())
-                        {
-                            method
-                        } else {
-                            return;
-                        };
-                        let uri =
-                            if let Some(uri) = parse_req.path.and_then(|p| Uri::from_str(p).ok()) {
-                                uri
-                            } else {
-                                return;
-                            };
-                        let headers = HeaderMap::new();
-
-                        let mut builder = http::Request::builder().method(method).uri(uri).version(
-                            if parse_req.version == Some(1) {
-                                Version::HTTP_11
-                            } else {
-                                Version::HTTP_10
-                            },
-                        );
-                        for header in parse_req.headers {
-                            builder = builder.header(header.name, header.value);
-                        }
-                        let request = builder.body(Vec::<u8>::new()).unwrap();
-
-                        break (request, body);
-                    }
-                };
-
-                let response = if request.uri().path().ends_with('/') {
-                    http::Response::builder()
-                        .version(request.version())
-                        .status(307)
-                        .header("Location", format!("{}index.html", request.uri().path()))
-                        .body(Vec::new())
-                        .unwrap()
-                } else if let Some(file) = output.get(request.uri().path()) {
-                    http::Response::builder()
-                        .version(request.version())
-                        .status(200)
-                        .body((&***file).to_vec())
-                        .unwrap()
-                } else {
-                    http::Response::builder()
-                        .version(request.version())
-                        .status(404)
-                        .body(b"not found".to_vec())
-                        .unwrap()
-                };
-
-                println!("[{}] {}", response.status(), request.uri());
-
-                let status_line = format!(
-                    "{:?} {} {}\r\n",
-                    response.version(),
-                    response.status().as_u16(),
-                    response.status().canonical_reason().unwrap()
-                );
-
-                let mut headers = String::new();
-                for (name, value) in response.headers() {
-                    headers.push_str(&format!("{}: {}\r\n", name, value.to_str().unwrap_or("")));
-                }
-
-                let body: &[u8] = response.body().as_ref();
-                let content_length = body.len();
-                headers.push_str(&format!("Content-Length: {}\r\n\r\n", content_length));
-
-                if stream.write_all(status_line.as_bytes()).is_err() {
-                    return;
-                }
-                if stream.write_all(headers.as_bytes()).is_err() {
-                    return;
-                }
-                if stream.write_all(body).is_err() {
-                    return;
-                }
-                let _ = stream.flush();
-            });
-        }
-    });
-
-    /*
-    output.into_par_iter().for_each(|(path, generator)| {
-        let contents = &*generator;
-        if let Some((dir, _)) = path.rsplit_once('/') {
-            std::fs::create_dir_all(dir).unwrap();
-        }
-        std::fs::write(path, contents).unwrap();
-    });
-    */
-
-    println!(
-        "({:.1}s) Saved website to {}",
-        start.elapsed().as_secs_f32(),
-        config.output
-    );
-}
-
-fn is_text_file(path: &Path) -> bool {
-    match path.extension().and_then(|s| s.to_str()) {
-        Some(ext) => matches!(ext.to_lowercase().as_str(), "txt"),
-        None => false,
+        println!(
+            "({:.1}s) Saved website to {}",
+            start.elapsed().as_secs_f32(),
+            config.output
+        );
     }
 }

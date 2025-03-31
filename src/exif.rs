@@ -4,6 +4,7 @@ use std::io::Cursor;
 
 /// https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
 #[derive(Debug, Clone, PartialEq)]
+#[allow(unused)]
 pub struct ExifData {
     pub width: Option<String>,
     pub height: Option<String>,

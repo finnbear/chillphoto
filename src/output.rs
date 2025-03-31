@@ -1,26 +1,12 @@
 use crate::{
     category_path::CategoryPath,
-    config::Config,
     gallery::{Gallery, Item, Page, PageFormat},
     photo::Photo,
-    util::{add_trailing_slash_if_nonempty, remove_dir_contents},
     CONFIG,
 };
-use chrono::NaiveDate;
-use core::num;
 use image::{ImageFormat, RgbImage};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    io::Cursor,
-    sync::{LazyLock, Mutex},
-};
-use std::{fs, sync::Arc};
-use yew::{
-    classes, function_component, html, virtual_dom::VText, AttrValue, Html, LocalServerRenderer,
-    Properties, ServerRenderer,
-};
+use std::{collections::HashMap, io::Cursor, sync::LazyLock};
+use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
 impl Gallery {
     pub fn output<'a>(
@@ -28,7 +14,7 @@ impl Gallery {
     ) -> HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>> {
         let config = &*CONFIG;
 
-        /// TODO: nested pages.
+        // TODO: nested pages.
         let page_items = self
             .children
             .iter()
@@ -215,7 +201,7 @@ pub struct RelativeNavigation {
 
 fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
     html! {
-        (items.iter().filter_map(|child| {
+        {items.iter().filter_map(|child| {
             match child {
                 Item::Photo(photo) => {
                     Some(html!{
@@ -282,7 +268,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                 }
                 Item::Page(_) => None
             }
-        }).collect::<Html>())
+        }).collect::<Html>()}
     }
 }
 
@@ -300,7 +286,6 @@ fn render_html(props: AppProps<'_>) -> Vec<u8> {
         props.html.clone()
     }
 
-    use std::ops::Deref;
     let renderer =
         LocalServerRenderer::<InnerApp>::with_props(InnerAppProps { html }).hydratable(false);
     let html = futures::executor::block_on(renderer.render());
