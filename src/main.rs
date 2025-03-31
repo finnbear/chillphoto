@@ -9,7 +9,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use serve::serve;
 use std::collections::HashMap;
 use std::fs;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::time::Instant;
 use util::remove_dir_contents;
 use wax::Glob;
@@ -63,6 +63,7 @@ fn main() {
     let gallery = Mutex::new(GalleryExtras {
         gallery: Gallery {
             children: Vec::new(),
+            favicon: None,
         },
         photo_configs: HashMap::new(),
     });
@@ -122,6 +123,12 @@ fn main() {
 
         let input_image_data = std::fs::read(entry.path()).unwrap();
 
+        let mut gallery = gallery.lock().unwrap();
+        if categories.is_root() && name_no_extension == "favicon" {
+            gallery.gallery.favicon = Some((input_image_data, OnceLock::new()));
+            return;
+        }
+
         let photo = Photo {
             name: name_no_extension,
             text: None,
@@ -133,7 +140,6 @@ fn main() {
             config: Default::default(),
         };
 
-        let mut gallery = gallery.lock().unwrap();
         let to_insert = gallery.gallery.get_or_create_category(&categories);
         to_insert.push(Item::Photo(photo));
     });

@@ -287,6 +287,7 @@ dependencies = [
  "markup_fmt",
  "rayon",
  "serde",
+ "serde_json",
  "toml",
  "wax",
  "yew",

@@ -1,12 +1,33 @@
+use std::sync::OnceLock;
+
 use crate::{category_path::CategoryPath, photo::Photo};
 use chrono::NaiveDate;
+use image::RgbImage;
 
 #[derive(Debug)]
 pub struct Gallery {
     pub children: Vec<Item>,
+    pub favicon: Option<(Vec<u8>, OnceLock<RgbImage>)>,
 }
 
 impl Gallery {
+    pub fn favicon(&self) -> Option<&RgbImage> {
+        self.favicon.as_ref().map(|(input, output)| {
+            output.get_or_init(|| {
+                image::load_from_memory(input)
+                    .expect("failed to load favicon")
+                    .to_rgb8()
+            })
+        })
+    }
+
+    pub fn children(&self, path: &CategoryPath) -> Option<&Vec<Item>> {
+        if path.is_root() {
+            return Some(&self.children);
+        }
+        self.category(path).map(|c| &c.children)
+    }
+
     pub fn category(&self, path: &CategoryPath) -> Option<&Category> {
         if path.is_root() {
             return None;

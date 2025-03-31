@@ -45,9 +45,7 @@ impl ExifData {
 
     pub fn load(file: &[u8]) -> Self {
         let exifreader = exif::Reader::new();
-        let meta = exifreader
-            .read_from_container(&mut Cursor::new(file))
-            .unwrap();
+        let meta = exifreader.read_from_container(&mut Cursor::new(file)).ok();
 
         /*
         for f in meta.fields() {
@@ -60,7 +58,8 @@ impl ExifData {
         }
         */
 
-        fn lookup(meta: &Exif, tag: Tag) -> Option<String> {
+        fn lookup(meta: &Option<Exif>, tag: Tag) -> Option<String> {
+            let meta = meta.as_ref()?;
             let field = meta.get_field(tag, In::PRIMARY)?;
             // TODO: rounding.
             Some(field.display_value().with_unit(meta).to_string())

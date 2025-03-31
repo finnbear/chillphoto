@@ -5,6 +5,7 @@ use crate::{
     CONFIG,
 };
 use image::{ImageFormat, RgbImage};
+use serde::Serialize;
 use std::{collections::HashMap, io::Cursor, sync::LazyLock};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
@@ -34,9 +35,8 @@ impl Gallery {
                     let mut num_photos = 0usize;
                     let mut photo_index = Option::<usize>::None;
                     let photos = self
-                        .category(&path)
+                        .children(&path)
                         .unwrap()
-                        .children
                         .iter()
                         .filter_map(|i| i.photo())
                         .collect::<Vec<_>>();
@@ -157,6 +157,22 @@ impl Gallery {
                 }
             }
         });
+
+        if self.favicon.is_some() {
+            let favicon_path = config.favicon::<false>();
+            ret.insert(
+                favicon_path.clone(),
+                LazyLock::new(Box::new(move || {
+                    write_image(self.favicon().unwrap(), &favicon_path)
+                })),
+            );
+        }
+
+        let manifest_path = config.manifest::<false>();
+        ret.insert(
+            manifest_path.clone(),
+            LazyLock::new(Box::new(move || write_manifest(self))),
+        );
 
         ret.insert(
             CONFIG.index_html::<false>(),
@@ -495,10 +511,17 @@ pub fn app(props: AppProps<'_>) -> Html {
                 if let Some(description) = props.description.clone() {
                     <meta name="description" content={description}/>
                 }
+                if !CONFIG.categories.is_empty() {
+                    <meta name="keywords" content={CONFIG.categories.join(",")}/>
+                }
                 if let Some(author) = CONFIG.author.clone() {
                     <meta name="author" content={author}/>
                 }
                 <meta name="generator" content="chillphoto"/>
+                if props.gallery.favicon.is_some() {
+                    <link rel="icon" type="image/png" href="/favicon.png"/>
+                }
+                <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 // Favicon
                 {props.head.clone()}
@@ -642,4 +665,29 @@ pub fn rich_text_html(text: &RichText) -> Html {
         ),
         RichTextFormat::Html => Html::from_html_unchecked(text.content.clone().into()),
     }
+}
+
+fn write_manifest(_gallery: &Gallery) -> Vec<u8> {
+    #[derive(Serialize)]
+    struct Manifest {
+        name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        display: String,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        categories: Vec<String>,
+        start_url: String,
+        handle_links: String,
+    }
+
+    let manifest = Manifest {
+        name: CONFIG.title.clone(),
+        description: CONFIG.description.clone(),
+        display: "standalone".to_owned(),
+        categories: CONFIG.categories.clone(),
+        start_url: "/".to_owned(),
+        handle_links: "not-preferred".to_owned(),
+    };
+
+    serde_json::to_string(&manifest).unwrap().into_bytes()
 }

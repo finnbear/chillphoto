@@ -13,6 +13,8 @@ pub struct Config {
     pub author: Option<String>,
     pub author_url: Option<String>,
     pub description: Option<String>,
+    #[serde(default = "default_categories")]
+    pub categories: Vec<String>,
     #[serde(default = "default_photo_format")]
     pub photo_format: String,
     #[serde(default = "default_photo_resolution")]
@@ -29,6 +31,10 @@ pub struct Config {
 
 fn default_input() -> String {
     String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html}")
+}
+
+fn default_categories() -> Vec<String> {
+    vec!["photo".to_owned()]
 }
 
 fn default_photo_format() -> String {
@@ -119,6 +125,20 @@ impl Config {
         format!(
             "{}/index.html",
             self.variation::<PUBLIC>(category, name, "")
+        )
+    }
+
+    pub fn favicon<const PUBLIC: bool>(&self) -> String {
+        format!(
+            "{}.png",
+            self.variation::<PUBLIC>(&CategoryPath::ROOT, "favicon", "")
+        )
+    }
+
+    pub fn manifest<const PUBLIC: bool>(&self) -> String {
+        format!(
+            "{}.json",
+            self.variation::<PUBLIC>(&CategoryPath::ROOT, "manifest", "")
         )
     }
 
