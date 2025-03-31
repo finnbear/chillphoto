@@ -1,6 +1,7 @@
 use http::{Method, Uri, Version};
 use httparse::Status;
 use std::str::FromStr;
+use std::time::Instant;
 use std::{
     collections::HashMap,
     io::{Read, Write},
@@ -13,8 +14,10 @@ use std::{
 };
 
 pub fn serve(
+    start: Instant,
     output: &HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + '_>>>,
 ) {
+    let background_threads = &AtomicUsize::new(0);
     let http_threads = &AtomicUsize::new(0);
     let mut queue = output.iter().collect::<Vec<_>>();
     queue.sort_by_key(|(path, _)| !path.contains("_thumbnail"));
@@ -23,21 +26,34 @@ pub fn serve(
         // Background initialization.
         let cpus = available_parallelism().map(|n| n.get()).unwrap_or(1);
         for thread in 0..cpus {
+            let _guard = Guard::new(background_threads);
             scope.spawn(move || {
-                while let Some((path, i)) = {
+                let _guard = _guard;
+                while let Some((_, i)) = {
                     let next = work.lock().unwrap().next();
                     next
                 } {
                     LazyLock::force(i);
-                    println!("[background] {path}");
                     while http_threads.load(Ordering::SeqCst) > thread {
                         std::thread::sleep(Duration::from_millis(100));
                     }
                 }
+
+                drop(_guard);
+
+                if background_threads.load(Ordering::SeqCst) == 0 {
+                    println!(
+                        "({:.1}s) Background processing complete",
+                        start.elapsed().as_secs_f32(),
+                    );
+                }
             });
         }
 
-        let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
+        let addr = "0.0.0.0:8080";
+        let listener = std::net::TcpListener::bind(addr).unwrap();
+
+        println!("({:.1}s) Serving on {addr}", start.elapsed().as_secs_f32());
 
         loop {
             let mut stream = if let Ok((stream, _)) = listener.accept() {
@@ -46,17 +62,7 @@ pub fn serve(
                 continue;
             };
             scope.spawn(move || {
-                struct Guard<'a>(&'a AtomicUsize);
-
-                http_threads.fetch_add(1, Ordering::SeqCst);
-
-                impl<'a> Drop for Guard<'a> {
-                    fn drop(&mut self) {
-                        self.0.fetch_sub(1, Ordering::SeqCst);
-                    }
-                }
-
-                let _guard = Guard(http_threads);
+                let _guard = Guard::new(http_threads);
 
                 let mut buf = Vec::new();
 
@@ -157,4 +163,19 @@ pub fn serve(
             });
         }
     });
+}
+
+struct Guard<'a>(&'a AtomicUsize);
+
+impl<'a> Guard<'a> {
+    pub fn new(counter: &'a AtomicUsize) -> Self {
+        counter.fetch_add(1, Ordering::SeqCst);
+        Self(counter)
+    }
+}
+
+impl<'a> Drop for Guard<'a> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }

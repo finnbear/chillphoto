@@ -157,7 +157,7 @@ fn main() {
     );
 
     if Args::parse().serve {
-        serve(&output);
+        serve(start, &output);
     } else {
         if fs::exists(&config.output).unwrap() {
             remove_dir_contents(&config.output).expect("failed to clear output directory");
