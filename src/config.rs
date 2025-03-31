@@ -156,9 +156,20 @@ impl Config {
 
 #[derive(Deserialize, Debug)]
 pub struct PhotoConfig {
+    #[serde(default)]
     pub order: i64,
+    #[serde(default = "default_thumbnail_crop_factor")]
     pub thumbnail_crop_factor: f64,
+    #[serde(default = "default_thumbnail_crop_center")]
     pub thumbnail_crop_center: Point2,
+}
+
+fn default_thumbnail_crop_factor() -> f64 {
+    1.0
+}
+
+fn default_thumbnail_crop_center() -> Point2 {
+    Point2 { x: 0.5, y: 0.5 }
 }
 
 impl Default for PhotoConfig {
@@ -175,4 +186,16 @@ impl Default for PhotoConfig {
 pub struct Point2 {
     pub x: f64,
     pub y: f64,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CategoryConfig {
+    #[serde(default)]
+    pub order: i64,
+}
+
+impl Default for CategoryConfig {
+    fn default() -> Self {
+        Self { order: 0 }
+    }
 }

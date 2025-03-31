@@ -1,12 +1,13 @@
 use category_path::CategoryPath;
 use chrono::NaiveDate;
 use clap::Parser;
-use config::{Config, PhotoConfig};
+use config::{CategoryConfig, Config, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::{LazyLock, Mutex, OnceLock};
@@ -57,7 +58,7 @@ fn main() {
 
     struct GalleryExtras {
         gallery: Gallery,
-        photo_configs: HashMap<CategoryPath, PhotoConfig>,
+        item_configs: HashMap<CategoryPath, String>,
     }
 
     let gallery = Mutex::new(GalleryExtras {
@@ -65,7 +66,7 @@ fn main() {
             children: Vec::new(),
             favicon: None,
         },
-        photo_configs: HashMap::new(),
+        item_configs: HashMap::new(),
     });
 
     let entries = glob
@@ -87,12 +88,11 @@ fn main() {
 
         if name.ends_with(".toml") {
             let config_text = fs::read_to_string(entry.path()).expect("couldn't read photo config");
-            let photo_config = toml::from_str::<PhotoConfig>(&config_text).unwrap();
 
             let mut gallery = gallery.lock().unwrap();
             gallery
-                .photo_configs
-                .insert(categories.push(name_no_extension), photo_config);
+                .item_configs
+                .insert(categories.push(name_no_extension), config_text);
             return;
         }
 
@@ -146,13 +146,18 @@ fn main() {
 
     let GalleryExtras {
         mut gallery,
-        mut photo_configs,
+        mut item_configs,
     } = gallery.into_inner().unwrap();
     let mut categories = 0usize;
     let mut photos = 0usize;
     let mut pages = 0usize;
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
+            if let Some(config) = item_configs.remove(&path.push(category.name.clone())) {
+                let config = toml::from_str::<CategoryConfig>(&config).unwrap();
+                category.config = config;
+            }
+
             let mut matches = Vec::<(String, RichText)>::new();
             for photo in category.children.iter().filter_map(|i| i.photo()) {
                 for page in category.children.iter().filter_map(|i| i.page()) {
@@ -193,7 +198,8 @@ fn main() {
             categories += 1;
         }
         Item::Photo(photo) => {
-            if let Some(config) = photo_configs.remove(&path.push(photo.name.clone())) {
+            if let Some(config) = item_configs.remove(&path.push(photo.name.clone())) {
+                let config = toml::from_str::<PhotoConfig>(&config).unwrap();
                 photo.config = config;
             }
             photos += 1;
@@ -203,15 +209,37 @@ fn main() {
         }
     });
 
+    #[derive(Eq, PartialEq, Ord, PartialOrd)]
+    enum Order {
+        Category {
+            order: Reverse<i64>,
+        },
+        Photo {
+            order: Reverse<i64>,
+            date: Reverse<Option<NaiveDate>>,
+        },
+        Irrelevant,
+    }
+
+    impl Order {
+        fn new(item: &Item) -> Self {
+            match item {
+                Item::Category(category) => Order::Category {
+                    order: Reverse(category.config.order),
+                },
+                Item::Photo(photo) => Order::Photo {
+                    order: Reverse(photo.config.order),
+                    date: Reverse(photo.exif.date()),
+                },
+                _ => Order::Irrelevant,
+            }
+        }
+    }
+
+    gallery.children.sort_by_key(Order::new);
     gallery.visit_items_mut(|_, item| match item {
         Item::Category(category) => {
-            category.children.sort_by_key(|item| {
-                std::cmp::Reverse(if let Some(photo) = item.photo() {
-                    (photo.config.order, photo.exif.date())
-                } else {
-                    (0, None)
-                })
-            });
+            category.children.sort_by_key(Order::new);
         }
         _ => {}
     });

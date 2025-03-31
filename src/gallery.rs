@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use crate::{category_path::CategoryPath, photo::Photo};
+use crate::{category_path::CategoryPath, config::CategoryConfig, photo::Photo};
 use chrono::NaiveDate;
 use image::RgbImage;
 
@@ -79,6 +79,7 @@ impl Gallery {
                     creation_date: None,
                     description: None,
                     children: Vec::new(),
+                    config: CategoryConfig::default(),
                 }));
 
                 current_items.last_mut().unwrap().category_mut().unwrap()
@@ -166,6 +167,7 @@ pub struct Category {
     pub creation_date: Option<NaiveDate>,
     pub description: Option<String>,
     pub children: Vec<Item>,
+    pub config: CategoryConfig,
 }
 
 impl Category {

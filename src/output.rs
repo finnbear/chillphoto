@@ -235,7 +235,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                             representative = Some((path.clone(), photo));
                         }
                     });
-                    let (photo_path, photo) = representative.unwrap();
+                    let (photo_path, photo) = representative?;
                     Some(html!{
                         <a
                             class="thumbnail_container category_item"
