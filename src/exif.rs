@@ -23,6 +23,7 @@ pub struct ExifData {
     pub focal_length: Option<String>,
     pub metering_mode: Option<String>,
     pub flash: Option<String>,
+    pub orientation: Option<String>,
 }
 
 impl ExifData {
@@ -43,20 +44,29 @@ impl ExifData {
             .map(|(d, _)| d)
     }
 
+    pub fn oriented(&self) -> bool {
+        self.orientation
+            .as_ref()
+            .is_some_and(|o| o.as_str() != "row 0 at top and column 0 at left")
+    }
+
     pub fn load(file: &[u8]) -> Self {
         let exifreader = exif::Reader::new();
         let meta = exifreader.read_from_container(&mut Cursor::new(file)).ok();
 
-        /*
-        for f in meta.fields() {
-            println!(
-                "{} {} {}",
-                f.tag,
-                f.ifd_num,
-                f.display_value().with_unit(&meta)
-            );
+        // Debug.
+        if false {
+            if let Some(meta) = &meta {
+                for f in meta.fields() {
+                    println!(
+                        "{} {} {}",
+                        f.tag,
+                        f.ifd_num,
+                        f.display_value().with_unit(meta)
+                    );
+                }
+            }
         }
-        */
 
         fn lookup(meta: &Option<Exif>, tag: Tag) -> Option<String> {
             let meta = meta.as_ref()?;
@@ -80,6 +90,7 @@ impl ExifData {
             focal_length: lookup(&meta, Tag::FocalLength),
             metering_mode: lookup(&meta, Tag::MeteringMode),
             flash: lookup(&meta, Tag::Flash),
+            orientation: lookup(&meta, Tag::Orientation),
         }
     }
 }

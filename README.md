@@ -65,22 +65,23 @@ thumbnail_crop_center = {
 
 ## Features
 - [x] Instantly preview gallery via embedded server
-- [x]  Generate a completely static gallery website site
-- [x]  Full, preview, and thumbnail sizes
-- [x]  Arbitrarily-nested photo categories
-- [x]  Arbitrary plain-text, Markdown, or HTML pages and captions
-- [ ]  Pagination
-- [ ]  Hot-reloading
-- [ ]  Diagnostics and error handling
-- [ ]  Support for themes
-- [ ]  Pages within categories
-- [ ]  Archive page organized by date
-- [ ]  Category descriptions and captions
-- [ ]  Optional comment support (via a 3rd party comment form)
-- [ ]  AI summarization of images
-- [ ]  Show subset of EXIF metadata
-- [ ]  RSS feed
-- [ ]  Optional visual editor
+- [x] Generate a completely static gallery website site
+- [x] Full, preview, and thumbnail sizes
+- [x] Arbitrarily-nested photo categories
+- [x] Arbitrary plain-text, Markdown, or HTML pages and captions
+- [ ] Pagination
+- [ ] Hot-reloading
+- [ ] Diagnostics and error handling
+- [ ] Support for themes
+- [ ] Progress bars
+- [ ] Pages within categories
+- [ ] Archive page organized by date
+- [ ] Category descriptions and captions
+- [ ] Optional comment support (via a 3rd party comment form)
+- [ ] AI summarization of images
+- [ ] Show subset of EXIF metadata
+- [ ] RSS feed
+- [ ] Optional visual editor
 
 ## License
 

@@ -2,9 +2,9 @@ use crate::{config::PhotoConfig, exif::ExifData, gallery::RichText, CONFIG};
 use chrono::{DateTime, NaiveDate};
 use image::{
     imageops::{self, FilterType},
-    RgbImage,
+    DynamicImage, ImageDecoder, ImageReader, RgbImage,
 };
-use std::{fmt::Debug, sync::OnceLock, time::SystemTime};
+use std::{fmt::Debug, io, sync::OnceLock, time::SystemTime};
 
 pub struct Photo {
     pub name: String,
@@ -33,7 +33,7 @@ impl Photo {
     }
 
     pub fn image_dimensions(&self) -> (u32, u32) {
-        if let Some((width, height)) = self.exif.dimensions() {
+        if let Some((width, height)) = self.exif.dimensions().filter(|_| !self.exif.oriented()) {
             // Avoid decoding the image if we don't have to.
             resize_dimensions(
                 width,
@@ -48,12 +48,19 @@ impl Photo {
 
     pub fn image(&self) -> &RgbImage {
         self.image.get_or_init(|| {
-            resize_image(
-                &image::load_from_memory(&self.input_image_data)
-                    .expect("failed to open image")
-                    .to_rgb8(),
-                CONFIG.photo_resolution,
-            )
+            let mut decoder = ImageReader::new(io::Cursor::new(&self.input_image_data))
+                .with_guessed_format()
+                .unwrap()
+                .into_decoder()
+                .unwrap();
+            let orientation = decoder.orientation();
+            let mut image = DynamicImage::from_decoder(decoder).unwrap();
+
+            if let Ok(orientation) = orientation {
+                image.apply_orientation(orientation);
+            }
+
+            resize_image(&image.to_rgb8(), CONFIG.photo_resolution)
         })
     }
 
