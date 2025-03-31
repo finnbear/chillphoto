@@ -188,7 +188,6 @@ fn main() {
         }
         Item::Photo(photo) => {
             if let Some(config) = photo_configs.remove(&path.push(photo.name.clone())) {
-                println!("config for {} is {:?}", photo.name, config);
                 photo.config = config;
             }
             photos += 1;

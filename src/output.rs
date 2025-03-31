@@ -92,6 +92,13 @@ impl Gallery {
                                     if let Some(text) = &photo.text {
                                         {rich_text_html(text)}
                                     }
+                                    /*
+                                    {Html::from_html_unchecked(r#"
+                                        <div class="commentbox"></div>
+                                        <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+                                        <script>commentBox('5728549692506112-proj')</script>
+                                    "#.into())}
+                                    */
                                 </>},
                                 pages: page_items,
                                 path: path.push(photo.name.clone()).clone(),
@@ -193,7 +200,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                                 alt={photo.name.clone()}
                                 src={CONFIG.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
-                                    "width: {}; height: {};",
+                                    "width: {}px; height: {}px;",
                                     CONFIG.thumbnail_resolution,
                                     CONFIG.thumbnail_resolution
                                 )}
@@ -221,7 +228,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                             <img
                                 class="thumbnail"
                                 style={format!(
-                                    "width: {}; height: {};",
+                                    "width: {}px; height: {}px;",
                                     CONFIG.thumbnail_resolution,
                                     CONFIG.thumbnail_resolution
                                 )}
@@ -389,6 +396,10 @@ pub fn app(props: AppProps<'_>) -> Html {
         #page_main_body {
             margin: 2rem;
             flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-content: flex-start;
         }
 
         #sidebar {
@@ -436,6 +447,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             gap: 0.5rem;
             border: 1px solid #e6e6e6;
             background-color: #FBFBF8;
+            height: min-content;
         }
 
         .category_item_info {

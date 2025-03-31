@@ -1,7 +1,7 @@
 use crate::{config::PhotoConfig, exif::ExifData, gallery::RichText, CONFIG};
 use image::{
     imageops::{self, FilterType},
-    DynamicImage, RgbImage,
+    RgbImage,
 };
 use std::{fmt::Debug, sync::OnceLock};
 
@@ -122,9 +122,9 @@ fn generate_thumbnail(img: &RgbImage, photo_config: &PhotoConfig) -> RgbImage {
         )
     };
 
-    let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size).to_image();
+    let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size);
     imageops::resize(
-        &cropped,
+        &*cropped,
         CONFIG.thumbnail_resolution,
         CONFIG.thumbnail_resolution,
         FilterType::Lanczos3,
@@ -135,7 +135,6 @@ fn resize_image(img: &RgbImage, resolution: u32) -> RgbImage {
     if img.width() <= resolution && img.height() <= resolution {
         return img.clone();
     }
-    DynamicImage::ImageRgb8(img.clone())
-        .resize(resolution, resolution, FilterType::Lanczos3)
-        .to_rgb8()
+    let (width, height) = resize_dimensions(img.width(), img.height(), resolution, resolution);
+    imageops::resize(img, width, height, FilterType::Lanczos3)
 }
