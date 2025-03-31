@@ -192,10 +192,14 @@ pub struct Point2 {
 pub struct CategoryConfig {
     #[serde(default)]
     pub order: i64,
+    pub thumbnail: Option<String>,
 }
 
 impl Default for CategoryConfig {
     fn default() -> Self {
-        Self { order: 0 }
+        Self {
+            order: 0,
+            thumbnail: None,
+        }
     }
 }

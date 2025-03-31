@@ -228,11 +228,10 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                 Item::Category(category) => {
                     let mut representative = Option::<(CategoryPath, &Photo)>::None;
                     category.visit_items(&category_path, |path, item| {
-                        if representative.is_some() {
-                            return;
-                        }
                         if let Item::Photo(photo) = item {
-                            representative = Some((path.clone(), photo));
+                            if representative.is_none() || category.config.thumbnail.as_ref() == Some(&photo.name) {
+                                representative = Some((path.clone(), photo));
+                            }
                         }
                     });
                     let (photo_path, photo) = representative?;
