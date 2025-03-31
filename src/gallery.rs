@@ -1,8 +1,7 @@
+use crate::{category_path::CategoryPath, photo::Photo};
 use chrono::NaiveDate;
 
-use crate::{category_path::CategoryPath, photo::Photo};
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Gallery {
     pub children: Vec<Item>,
 }
@@ -99,7 +98,7 @@ pub fn visit_children_items_mut(
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Item {
     Category(Category),
     Photo(Photo),
@@ -140,7 +139,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Category {
     pub name: String,
     pub creation_date: Option<NaiveDate>,

@@ -1,12 +1,13 @@
 use category_path::CategoryPath;
 use chrono::NaiveDate;
 use clap::Parser;
-use config::Config;
+use config::{Config, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
+use std::collections::HashMap;
 use std::fs;
 use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
@@ -54,8 +55,16 @@ fn main() {
     }
     let (root, glob) = Glob::new(&input_path_string).unwrap().partition();
 
-    let gallery = Mutex::new(Gallery {
-        children: Vec::new(),
+    struct GalleryExtras {
+        gallery: Gallery,
+        photo_configs: HashMap<CategoryPath, PhotoConfig>,
+    }
+
+    let gallery = Mutex::new(GalleryExtras {
+        gallery: Gallery {
+            children: Vec::new(),
+        },
+        photo_configs: HashMap::new(),
     });
 
     let entries = glob
@@ -73,7 +82,16 @@ fn main() {
             (CategoryPath::ROOT, name.as_str())
         };
 
+        let name_no_extension = name.rsplit_once('.').unwrap().0.to_owned();
+
         if name.ends_with(".toml") {
+            let config_text = fs::read_to_string(entry.path()).expect("couldn't read photo config");
+            let photo_config = toml::from_str::<PhotoConfig>(&config_text).unwrap();
+
+            let mut gallery = gallery.lock().unwrap();
+            gallery
+                .photo_configs
+                .insert(categories.push(name_no_extension), photo_config);
             return;
         }
 
@@ -90,9 +108,9 @@ fn main() {
         if let Some(format) = page_format {
             let file = std::fs::read_to_string(entry.path()).unwrap();
             let mut gallery = gallery.lock().unwrap();
-            let to_insert = gallery.get_or_create_category(&categories);
+            let to_insert = gallery.gallery.get_or_create_category(&categories);
             to_insert.push(Item::Page(Page {
-                name: name.rsplit_once('.').unwrap().0.to_owned(),
+                name: name_no_extension,
                 description: None,
                 text: RichText {
                     content: file,
@@ -105,25 +123,29 @@ fn main() {
         let input_image_data = std::fs::read(entry.path()).unwrap();
 
         let photo = Photo {
-            name: name.rsplit_once('.').unwrap().0.to_owned(),
+            name: name_no_extension,
             text: None,
             exif: ExifData::load(&input_image_data),
             input_image_data,
             image: Default::default(),
             preview: Default::default(),
             thumbnail: Default::default(),
+            config: Default::default(),
         };
 
         let mut gallery = gallery.lock().unwrap();
-        let to_insert = gallery.get_or_create_category(&categories);
+        let to_insert = gallery.gallery.get_or_create_category(&categories);
         to_insert.push(Item::Photo(photo));
     });
 
-    let mut gallery = gallery.into_inner().unwrap();
+    let GalleryExtras {
+        mut gallery,
+        mut photo_configs,
+    } = gallery.into_inner().unwrap();
     let mut categories = 0usize;
     let mut photos = 0usize;
     let mut pages = 0usize;
-    gallery.visit_items_mut(|_, item| match item {
+    gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
             let mut matches = Vec::<(String, RichText)>::new();
             for photo in category.children.iter().filter_map(|i| i.photo()) {
@@ -164,12 +186,29 @@ fn main() {
 
             categories += 1;
         }
-        Item::Photo(_) => {
+        Item::Photo(photo) => {
+            if let Some(config) = photo_configs.remove(&path.push(photo.name.clone())) {
+                println!("config for {} is {:?}", photo.name, config);
+                photo.config = config;
+            }
             photos += 1;
         }
         Item::Page(_) => {
             pages += 1;
         }
+    });
+
+    gallery.visit_items_mut(|_, item| match item {
+        Item::Category(category) => {
+            category.children.sort_by_key(|item| {
+                std::cmp::Reverse(if let Some(photo) = item.photo() {
+                    (photo.config.order, photo.exif.date())
+                } else {
+                    (0, None)
+                })
+            });
+        }
+        _ => {}
     });
 
     //println!("{gallery:?}");

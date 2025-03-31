@@ -1,11 +1,10 @@
-use crate::{exif::ExifData, gallery::RichText, CONFIG};
+use crate::{config::PhotoConfig, exif::ExifData, gallery::RichText, CONFIG};
 use image::{
     imageops::{self, FilterType},
     DynamicImage, RgbImage,
 };
 use std::{fmt::Debug, sync::OnceLock};
 
-#[derive(PartialEq)]
 pub struct Photo {
     pub name: String,
     pub text: Option<RichText>,
@@ -14,6 +13,7 @@ pub struct Photo {
     pub preview: OnceLock<RgbImage>,
     pub thumbnail: OnceLock<RgbImage>,
     pub exif: ExifData,
+    pub config: PhotoConfig,
 }
 
 impl Photo {
@@ -59,7 +59,7 @@ impl Photo {
 
     pub fn thumbnail(&self) -> &RgbImage {
         self.thumbnail
-            .get_or_init(|| generate_thumbnail(self.image()))
+            .get_or_init(|| generate_thumbnail(self.image(), &self.config))
     }
 }
 
@@ -100,11 +100,28 @@ fn resize_dimensions(width: u32, height: u32, nwidth: u32, nheight: u32) -> (u32
     }
 }
 
-fn generate_thumbnail(img: &RgbImage) -> RgbImage {
+fn generate_thumbnail(img: &RgbImage, photo_config: &PhotoConfig) -> RgbImage {
     let (width, height) = img.dimensions();
-    let size = width.min(height);
-    let x_offset = (width - size) / 2;
-    let y_offset = (height - size) / 2;
+    let (size, x_offset, y_offset) = if false {
+        let size = width.min(height);
+        let x_offset = (width - size) / 2;
+        let y_offset = (height - size) / 2;
+        (size, x_offset, y_offset)
+    } else {
+        let min = width.min(height);
+        let dim = min as f64 / photo_config.thumbnail_crop_factor.max(1.0);
+        let x_center = width as f64 * photo_config.thumbnail_crop_center.x;
+        let y_center = height as f64 * photo_config.thumbnail_crop_center.y;
+        let x_offset = x_center - dim * 0.5;
+        let y_offset = y_center - dim * 0.5;
+        let size = dim.ceil() as u32;
+        (
+            size,
+            (x_offset as u32).min(width - size),
+            (y_offset as u32).min(height - size),
+        )
+    };
+
     let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size).to_image();
     imageops::resize(
         &cropped,

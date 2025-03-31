@@ -133,3 +133,26 @@ impl Config {
         )
     }
 }
+
+#[derive(Deserialize, Debug)]
+pub struct PhotoConfig {
+    pub order: i64,
+    pub thumbnail_crop_factor: f64,
+    pub thumbnail_crop_center: Point2,
+}
+
+impl Default for PhotoConfig {
+    fn default() -> Self {
+        Self {
+            order: 0,
+            thumbnail_crop_factor: 1.0,
+            thumbnail_crop_center: Point2 { x: 0.5, y: 0.5 },
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Point2 {
+    pub x: f64,
+    pub y: f64,
+}
