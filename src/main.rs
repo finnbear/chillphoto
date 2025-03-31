@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use clap::Parser;
 use config::Config;
 use exif::ExifData;
-use gallery::{Gallery, Item, Page, PageFormat};
+use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
@@ -73,12 +73,16 @@ fn main() {
             (CategoryPath::ROOT, name.as_str())
         };
 
+        if name.ends_with(".toml") {
+            return;
+        }
+
         let page_format = if name.ends_with(".html") {
-            Some(PageFormat::Html)
+            Some(RichTextFormat::Html)
         } else if name.ends_with(".md") {
-            Some(PageFormat::Markdown)
+            Some(RichTextFormat::Markdown)
         } else if name.ends_with(".txt") {
-            Some(PageFormat::PlainText)
+            Some(RichTextFormat::PlainText)
         } else {
             None
         };
@@ -90,8 +94,10 @@ fn main() {
             to_insert.push(Item::Page(Page {
                 name: name.rsplit_once('.').unwrap().0.to_owned(),
                 description: None,
-                content: file,
-                format,
+                text: RichText {
+                    content: file,
+                    format,
+                },
             }));
             return;
         }
@@ -100,7 +106,7 @@ fn main() {
 
         let photo = Photo {
             name: name.rsplit_once('.').unwrap().0.to_owned(),
-            description: None,
+            text: None,
             exif: ExifData::load(&input_image_data),
             input_image_data,
             image: Default::default(),
@@ -119,6 +125,29 @@ fn main() {
     let mut pages = 0usize;
     gallery.visit_items_mut(|_, item| match item {
         Item::Category(category) => {
+            let mut matches = Vec::<(String, RichText)>::new();
+            for photo in category.children.iter().filter_map(|i| i.photo()) {
+                for page in category.children.iter().filter_map(|i| i.page()) {
+                    if photo.name == page.name {
+                        matches.push((photo.name.clone(), page.text.clone()));
+                    }
+                }
+            }
+            for (name, text) in matches {
+                category.children.retain_mut(|child| {
+                    match child {
+                        Item::Photo(photo) => {
+                            if photo.name == name {
+                                photo.text = Some(text.clone());
+                            }
+                        }
+                        Item::Page(page) => return page.name != name,
+                        _ => {}
+                    }
+                    true
+                });
+            }
+
             let mut first_date = Option::<NaiveDate>::None;
 
             category.visit_items(&CategoryPath::ROOT, |_, child| {

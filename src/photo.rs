@@ -1,4 +1,4 @@
-use crate::{exif::ExifData, CONFIG};
+use crate::{exif::ExifData, gallery::RichText, CONFIG};
 use image::{
     imageops::{self, FilterType},
     DynamicImage, RgbImage,
@@ -8,7 +8,7 @@ use std::{fmt::Debug, sync::OnceLock};
 #[derive(PartialEq)]
 pub struct Photo {
     pub name: String,
-    pub description: Option<String>,
+    pub text: Option<RichText>,
     pub input_image_data: Vec<u8>,
     pub image: OnceLock<RgbImage>,
     pub preview: OnceLock<RgbImage>,

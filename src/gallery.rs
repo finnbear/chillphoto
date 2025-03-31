@@ -163,16 +163,21 @@ impl Category {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct RichText {
+    pub content: String,
+    pub format: RichTextFormat,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Page {
     pub name: String,
     pub description: Option<String>,
-    pub content: String,
-    pub format: PageFormat,
+    pub text: RichText,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PageFormat {
+pub enum RichTextFormat {
     PlainText,
     Markdown,
     Html,

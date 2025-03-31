@@ -1,6 +1,6 @@
 use crate::{
     category_path::CategoryPath,
-    gallery::{Gallery, Item, Page, PageFormat},
+    gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
     CONFIG,
 };
@@ -74,9 +74,9 @@ impl Gallery {
                             render_html(AppProps {
                                 gallery: self,
                                 title: photo.name.clone().into(),
-                                description: photo.description.clone().map(|d| d.into()),
+                                description: None,
                                 head: Default::default(),
-                                body: html! {
+                                body: html! {<>
                                     <a
                                         class="preview_container"
                                         href={config.photo::<true>(&path, &photo.name)}
@@ -89,7 +89,10 @@ impl Gallery {
                                             src={config.preview::<true>(&path, &photo.name)}
                                         />
                                     </a>
-                                },
+                                    if let Some(text) = &photo.text {
+                                        {rich_text_html(text)}
+                                    }
+                                </>},
                                 pages: page_items,
                                 path: path.push(photo.name.clone()).clone(),
                                 relative: Some(RelativeNavigation {
@@ -132,35 +135,12 @@ impl Gallery {
                     ret.insert(
                         config.page_html::<false>(&path, &page.name),
                         LazyLock::new(Box::new(move || {
-                            let body = match page.format {
-                                PageFormat::PlainText => page
-                                    .content
-                                    .lines()
-                                    .map(|line| {
-                                        html! {<>
-                                            {line}
-                                            <br/>
-                                        </>}
-                                    })
-                                    .collect(),
-                                PageFormat::Markdown => Html::from_html_unchecked(
-                                    markdown::to_html_with_options(
-                                        &page.content,
-                                        &markdown::Options::gfm(),
-                                    )
-                                    .unwrap()
-                                    .into(),
-                                ),
-                                PageFormat::Html => {
-                                    Html::from_html_unchecked(page.content.clone().into())
-                                }
-                            };
                             render_html(AppProps {
                                 gallery: self,
                                 title: page.name.clone().into(),
                                 description: None,
                                 head: Default::default(),
-                                body,
+                                body: rich_text_html(&page.text),
                                 pages: page_items.clone(),
                                 path: path.push(page.name.clone()).clone(),
                                 relative: None,
@@ -629,4 +609,25 @@ pub fn write_image(img: &RgbImage, path: &str) -> Vec<u8> {
     img.write_to(&mut ret, ImageFormat::from_path(path).unwrap())
         .unwrap();
     ret.into_inner()
+}
+
+pub fn rich_text_html(text: &RichText) -> Html {
+    match text.format {
+        RichTextFormat::PlainText => text
+            .content
+            .lines()
+            .map(|line| {
+                html! {<>
+                    {line}
+                    <br/>
+                </>}
+            })
+            .collect(),
+        RichTextFormat::Markdown => Html::from_html_unchecked(
+            markdown::to_html_with_options(&text.content, &markdown::Options::gfm())
+                .unwrap()
+                .into(),
+        ),
+        RichTextFormat::Html => Html::from_html_unchecked(text.content.clone().into()),
+    }
 }
