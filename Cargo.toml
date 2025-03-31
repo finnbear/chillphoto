@@ -1,7 +1,11 @@
 [package]
 name = "chillphoto"
+authors = ["Finn Bear"]
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/finnbear/chillphoto/"
+description = "Static photo gallery website generator"
 
 [dependencies]
 chrono = "0.4.40"

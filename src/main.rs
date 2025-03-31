@@ -1,6 +1,6 @@
 use category_path::CategoryPath;
 use chrono::NaiveDate;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use config::{CategoryConfig, Config, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
@@ -10,6 +10,7 @@ use serve::serve;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::sync::{LazyLock, Mutex, OnceLock};
 use std::time::Instant;
 use util::remove_dir_contents;
@@ -31,13 +32,40 @@ pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
 });
 
 #[derive(Parser)]
+#[clap(name = "chillphoto", version)]
 struct Args {
-    #[clap(long)]
-    serve: bool,
+    #[clap(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Create default top-level configuration file.
+    Init,
+    /// Serve gallery preview.
+    Serve,
+    /// Build static gallery website.
+    Build,
 }
 
 fn main() {
     let start = Instant::now();
+
+    let args = Args::parse();
+
+    if matches!(args.command, Command::Init) {
+        let config = toml::from_str::<Config>("").unwrap();
+        let string = toml::to_string(&config).unwrap();
+        let mut file = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open("./chillphoto.toml")
+            .unwrap();
+        file.write_all(string.as_bytes()).unwrap();
+        file.flush().unwrap();
+        file.sync_all().unwrap();
+        return;
+    }
 
     LazyLock::force(&CONFIG);
     let config = &*CONFIG;
@@ -259,7 +287,7 @@ fn main() {
         start.elapsed().as_secs_f32(),
     );
 
-    if Args::parse().serve {
+    if matches!(args.command, Command::Serve) {
         serve(start, &output);
     } else {
         if fs::exists(&config.output).unwrap() {

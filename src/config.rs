@@ -1,14 +1,14 @@
-use serde::Deserialize;
+use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty, CONFIG};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty, CONFIG};
-
-#[derive(Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Config {
     #[serde(default = "default_input")]
     pub input: String,
     #[serde(default = "default_output")]
     pub output: String,
+    #[serde(default = "default_title")]
     pub title: String,
     pub author: Option<String>,
     pub author_url: Option<String>,
@@ -30,7 +30,11 @@ pub struct Config {
 }
 
 fn default_input() -> String {
-    String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html}")
+    String::from("**/*.{png,PNG,jpg,JPG,jpeg,JPEG,txt,md,html,toml}")
+}
+
+fn default_title() -> String {
+    "My Gallery".to_owned()
 }
 
 fn default_categories() -> Vec<String> {
@@ -174,11 +178,7 @@ fn default_thumbnail_crop_center() -> Point2 {
 
 impl Default for PhotoConfig {
     fn default() -> Self {
-        Self {
-            order: 0,
-            thumbnail_crop_factor: 1.0,
-            thumbnail_crop_center: Point2 { x: 0.5, y: 0.5 },
-        }
+        toml::from_str("").unwrap()
     }
 }
 
@@ -197,9 +197,6 @@ pub struct CategoryConfig {
 
 impl Default for CategoryConfig {
     fn default() -> Self {
-        Self {
-            order: 0,
-            thumbnail: None,
-        }
+        toml::from_str("").unwrap()
     }
 }
