@@ -41,150 +41,164 @@ impl Gallery {
             LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
         >::new();
 
-        self.visit_items(|path, item| match item {
-            Item::Photo(photo) => {
-                let mut num_photos = 0usize;
-                let mut photo_index = Option::<usize>::None;
-                let photos = self
-                    .category(&path)
-                    .unwrap()
-                    .children
-                    .iter()
-                    .filter_map(|i| i.photo())
-                    .collect::<Vec<_>>();
-                for p in &photos {
-                    if p.name == photo.name {
-                        photo_index = Some(num_photos);
+        self.visit_items(|path, item| {
+            let path = path.clone();
+            match item {
+                Item::Photo(photo) => {
+                    let mut num_photos = 0usize;
+                    let mut photo_index = Option::<usize>::None;
+                    let photos = self
+                        .category(&path)
+                        .unwrap()
+                        .children
+                        .iter()
+                        .filter_map(|i| i.photo())
+                        .collect::<Vec<_>>();
+                    for p in &photos {
+                        if p.name == photo.name {
+                            photo_index = Some(num_photos);
+                        }
+                        num_photos += 1;
                     }
-                    num_photos += 1;
+                    let photo_index = photo_index.unwrap();
+                    let photo_path = config.photo::<false>(&path, &photo.name);
+                    ret.insert(
+                        photo_path.clone(),
+                        LazyLock::new(Box::new(move || write_image(photo.image(), &photo_path))),
+                    );
+                    let preview_path = config.preview::<false>(&path, &photo.name);
+                    ret.insert(
+                        preview_path.clone(),
+                        LazyLock::new(Box::new(move || {
+                            write_image(photo.preview(), &preview_path)
+                        })),
+                    );
+                    let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
+                    ret.insert(
+                        thumbnail_path.clone(),
+                        LazyLock::new(Box::new(move || {
+                            write_image(photo.thumbnail(), &thumbnail_path)
+                        })),
+                    );
+
+                    let page_items = page_items.clone();
+                    ret.insert(
+                        config.photo_html::<false>(&path, &photo.name),
+                        LazyLock::new(Box::new(move || {
+                            render_html(AppProps {
+                                gallery: self.clone(),
+                                title: photo.name.clone().into(),
+                                description: photo.description.clone().map(|d| d.into()),
+                                head: Default::default(),
+                                body: html! {
+                                    <a
+                                        class="preview_container"
+                                        href={config.photo::<true>(&path, &photo.name)}
+                                    >
+                                        <img
+                                            class="preview"
+                                            width={photo.preview_dimensions().0.to_string()}
+                                            height={photo.preview_dimensions().1.to_string()}
+                                            alt={photo.name.clone()}
+                                            src={config.preview::<true>(&path, &photo.name)}
+                                        />
+                                    </a>
+                                },
+                                pages: page_items,
+                                path: path.push(photo.name.clone()).clone(),
+                                relative: Some(RelativeNavigation {
+                                    index: photo_index,
+                                    count: num_photos,
+                                    previous: photo_index
+                                        .checked_sub(1)
+                                        .and_then(|i| photos.get(i))
+                                        .map(|p| config.photo_html::<true>(&path, &p.name)),
+                                    next: photo_index
+                                        .checked_add(1)
+                                        .and_then(|i| photos.get(i))
+                                        .map(|p| config.photo_html::<true>(&path, &p.name)),
+                                }),
+                            })
+                        })),
+                    );
                 }
-                let photo_index = photo_index.unwrap();
-                let photo_path = config.photo::<false>(&path, &photo.name);
-                ret.insert(
-                    photo_path.clone(),
-                    LazyLock::new(Box::new(move || write_image(photo.image(), &photo_path))),
-                );
-                let preview_path = config.preview::<false>(&path, &photo.name);
-                ret.insert(
-                    preview_path.clone(),
-                    LazyLock::new(Box::new(move || {
-                        write_image(photo.preview(), &preview_path)
-                    })),
-                );
-                let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
-                ret.insert(
-                    thumbnail_path.clone(),
-                    LazyLock::new(Box::new(move || {
-                        write_image(photo.thumbnail(), &thumbnail_path)
-                    })),
-                );
-
-                let contents = render_html(AppProps {
-                    gallery: self.clone(),
-                    title: photo.name.clone().into(),
-                    description: photo.description.clone().map(|d| d.into()),
-                    head: Default::default(),
-                    body: html! {
-                        <a
-                            class="preview_container"
-                            href={config.photo::<true>(&path, &photo.name)}
-                        >
-                            <img
-                                class="preview"
-                                width={photo.preview_dimensions().0.to_string()}
-                                height={photo.preview_dimensions().1.to_string()}
-                                alt={photo.name.clone()}
-                                src={config.preview::<true>(&path, &photo.name)}
-                            />
-                        </a>
-                    },
-                    pages: page_items.clone(),
-                    path: path.push(photo.name.clone()).clone(),
-                    relative: Some(RelativeNavigation {
-                        index: photo_index,
-                        count: num_photos,
-                        previous: photo_index
-                            .checked_sub(1)
-                            .and_then(|i| photos.get(i))
-                            .map(|p| config.photo_html::<true>(&path, &p.name)),
-                        next: photo_index
-                            .checked_add(1)
-                            .and_then(|i| photos.get(i))
-                            .map(|p| config.photo_html::<true>(&path, &p.name)),
-                    }),
-                });
-                ret.insert(
-                    config.photo_html::<false>(&path, &photo.name),
-                    LazyLock::new(Box::new(move || contents)),
-                );
-            }
-            Item::Category(category) => {
-                let category_path = path.push(category.slug());
-                let contents = render_html(AppProps {
-                    gallery: self.clone(),
-                    title: category.name.clone().into(),
-                    description: category.description.clone().map(|d| d.into()),
-                    head: Default::default(),
-                    body: render_items(&category_path, &category.children),
-                    pages: page_items.clone(),
-                    path: category_path.clone(),
-                    relative: None,
-                });
-                ret.insert(
-                    config.category_html::<false>(&path, &category.slug()),
-                    LazyLock::new(Box::new(move || contents)),
-                );
-            }
-            Item::Page(page) => {
-                let body = match page.format {
-                    PageFormat::PlainText => page
-                        .content
-                        .lines()
-                        .map(|line| {
-                            html! {<>
-                                {line}
-                                <br/>
-                            </>}
-                        })
-                        .collect(),
-                    PageFormat::Markdown => Html::from_html_unchecked(
-                        markdown::to_html_with_options(&page.content, &markdown::Options::gfm())
-                            .unwrap()
-                            .into(),
-                    ),
-                    PageFormat::Html => Html::from_html_unchecked(page.content.clone().into()),
-                };
-
-                let contents = render_html(AppProps {
-                    gallery: self.clone(),
-                    title: page.name.clone().into(),
-                    description: None,
-                    head: Default::default(),
-                    body,
-                    pages: page_items.clone(),
-                    path: path.push(page.name.clone()).clone(),
-                    relative: None,
-                });
-                ret.insert(
-                    config.page_html::<false>(&path, &page.name),
-                    LazyLock::new(Box::new(move || contents)),
-                );
+                Item::Category(category) => {
+                    let category_path = path.push(category.slug());
+                    let page_items = page_items.clone();
+                    ret.insert(
+                        config.category_html::<false>(&path, &category.slug()),
+                        LazyLock::new(Box::new(move || {
+                            render_html(AppProps {
+                                gallery: self.clone(),
+                                title: category.name.clone().into(),
+                                description: category.description.clone().map(|d| d.into()),
+                                head: Default::default(),
+                                body: render_items(&category_path, &category.children),
+                                pages: page_items,
+                                path: category_path.clone(),
+                                relative: None,
+                            })
+                        })),
+                    );
+                }
+                Item::Page(page) => {
+                    let page_items = page_items.clone();
+                    ret.insert(
+                        config.page_html::<false>(&path, &page.name),
+                        LazyLock::new(Box::new(move || {
+                            let body = match page.format {
+                                PageFormat::PlainText => page
+                                    .content
+                                    .lines()
+                                    .map(|line| {
+                                        html! {<>
+                                            {line}
+                                            <br/>
+                                        </>}
+                                    })
+                                    .collect(),
+                                PageFormat::Markdown => Html::from_html_unchecked(
+                                    markdown::to_html_with_options(
+                                        &page.content,
+                                        &markdown::Options::gfm(),
+                                    )
+                                    .unwrap()
+                                    .into(),
+                                ),
+                                PageFormat::Html => {
+                                    Html::from_html_unchecked(page.content.clone().into())
+                                }
+                            };
+                            render_html(AppProps {
+                                gallery: self.clone(),
+                                title: page.name.clone().into(),
+                                description: None,
+                                head: Default::default(),
+                                body,
+                                pages: page_items.clone(),
+                                path: path.push(page.name.clone()).clone(),
+                                relative: None,
+                            })
+                        })),
+                    );
+                }
             }
         });
 
-        let contents = render_html(AppProps {
-            gallery: self.clone(),
-            title: config.title.clone().into(),
-            description: CONFIG.description.clone().map(|d| d.into()),
-            head: Default::default(),
-            body: render_items(&CategoryPath::ROOT, &self.children),
-            pages: page_items,
-            path: CategoryPath::ROOT,
-            relative: None,
-        });
         ret.insert(
             CONFIG.index_html::<false>(),
-            LazyLock::new(Box::new(move || contents)),
+            LazyLock::new(Box::new(move || {
+                render_html(AppProps {
+                    gallery: self.clone(),
+                    title: config.title.clone().into(),
+                    description: CONFIG.description.clone().map(|d| d.into()),
+                    head: Default::default(),
+                    body: render_items(&CategoryPath::ROOT, &self.children),
+                    pages: page_items,
+                    path: CategoryPath::ROOT,
+                    relative: None,
+                })
+            })),
         );
 
         ret
@@ -272,6 +286,7 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
     }
 }
 
+// Takes around 10ms.
 fn render_html(props: AppProps) -> Vec<u8> {
     use std::ops::Deref;
     let renderer = LocalServerRenderer::<App>::with_props(props).hydratable(false);
