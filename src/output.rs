@@ -532,7 +532,11 @@ pub fn app(props: &AppProps) -> Html {
                             html!{
                                 <a
                                     class={"breadcrumb"}
-                                    href={path.to_string_with_leading_slash()}
+                                    href={if path.is_root() {
+                                        CONFIG.index_html::<true>()
+                                    } else {
+                                        CONFIG.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
+                                    }}
                                 >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
                             }
                         } else {

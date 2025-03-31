@@ -19,8 +19,10 @@ use std::io::Write;
 use std::io::{Cursor, Read};
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Instant;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, LazyLock, Mutex};
+use std::thread::available_parallelism;
+use std::time::{Duration, Instant};
 use util::remove_dir_contents;
 use wax::Glob;
 
@@ -153,7 +155,7 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    let output = gallery.output();
+    let output = &gallery.output();
 
     println!(
         "({:.1}s) Generated output manifest",
@@ -164,8 +166,29 @@ fn main() {
         remove_dir_contents(&config.output).expect("failed to clear output directory");
     }
 
-    let output = &output;
+    let http_threads = &AtomicUsize::new(0);
+    let http_idle = &Condvar::new();
+    let mut queue = output.iter().collect::<Vec<_>>();
+    queue.sort_by_key(|(path, _)| !path.contains("_thumbnail"));
+    let work = &Mutex::new(queue.iter());
     std::thread::scope(|scope| {
+        // Background initialization.
+        let cpus = available_parallelism().map(|n| n.get()).unwrap_or(1);
+        for thread in 0..cpus {
+            scope.spawn(move || {
+                while let Some((path, i)) = {
+                    let next = work.lock().unwrap().next();
+                    next
+                } {
+                    LazyLock::force(i);
+                    println!("[background] {path}");
+                    while http_threads.load(Ordering::SeqCst) > thread {
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
+                }
+            });
+        }
+
         let listener = std::net::TcpListener::bind("0.0.0.0:8080").unwrap();
 
         loop {
@@ -175,6 +198,18 @@ fn main() {
                 continue;
             };
             scope.spawn(move || {
+                struct Guard<'a>(&'a AtomicUsize);
+
+                http_threads.fetch_add(1, Ordering::SeqCst);
+
+                impl<'a> Drop for Guard<'a> {
+                    fn drop(&mut self) {
+                        self.0.fetch_sub(1, Ordering::SeqCst);
+                    }
+                }
+
+                let _guard = Guard(http_threads);
+
                 let mut buf = Vec::new();
 
                 let (request, body) = loop {
@@ -189,7 +224,7 @@ fn main() {
                         }
                     };
 
-                    let mut headers = [httparse::EMPTY_HEADER; 16];
+                    let mut headers = [httparse::EMPTY_HEADER; 128];
                     let mut parse_req = httparse::Request::new(&mut headers);
                     let res = parse_req.parse(&buf).unwrap();
                     if let Status::Complete(body) = res {
@@ -224,19 +259,28 @@ fn main() {
                     }
                 };
 
-                println!("{request:?}");
-
-                let response_body = if let Some(file) = output.get(request.uri().path()) {
-                    (&***file).to_vec()
+                let response = if request.uri().path().ends_with('/') {
+                    http::Response::builder()
+                        .version(request.version())
+                        .status(307)
+                        .header("Location", format!("{}index.html", request.uri().path()))
+                        .body(Vec::new())
+                        .unwrap()
+                } else if let Some(file) = output.get(request.uri().path()) {
+                    http::Response::builder()
+                        .version(request.version())
+                        .status(200)
+                        .body((&***file).to_vec())
+                        .unwrap()
                 } else {
-                    b"not found".to_vec()
+                    http::Response::builder()
+                        .version(request.version())
+                        .status(404)
+                        .body(b"not found".to_vec())
+                        .unwrap()
                 };
 
-                let response = http::Response::builder()
-                    .version(request.version())
-                    .status(200)
-                    .body(response_body)
-                    .unwrap();
+                println!("[{}] {}", response.status(), request.uri());
 
                 let status_line = format!(
                     "{:?} {} {}\r\n",
@@ -254,10 +298,16 @@ fn main() {
                 let content_length = body.len();
                 headers.push_str(&format!("Content-Length: {}\r\n\r\n", content_length));
 
-                stream.write_all(status_line.as_bytes()).unwrap();
-                stream.write_all(headers.as_bytes()).unwrap();
-                stream.write_all(body).unwrap();
-                stream.flush().unwrap();
+                if stream.write_all(status_line.as_bytes()).is_err() {
+                    return;
+                }
+                if stream.write_all(headers.as_bytes()).is_err() {
+                    return;
+                }
+                if stream.write_all(body).is_err() {
+                    return;
+                }
+                let _ = stream.flush();
             });
         }
     });

@@ -26,6 +26,15 @@ impl CategoryPath {
         self.segments.is_empty()
     }
 
+    pub fn pop(&self) -> Option<Self> {
+        let mut ret = self.clone();
+        if ret.segments.pop().is_some() {
+            Some(ret)
+        } else {
+            None
+        }
+    }
+
     pub fn push(&self, segment: String) -> Self {
         let mut segments = self.segments.clone();
         segments.push(segment);
