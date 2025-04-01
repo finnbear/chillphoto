@@ -64,10 +64,14 @@ impl Gallery {
         visit_children_items_mut(&CategoryPath::ROOT, &mut self.children, &mut visitor);
     }
 
-    pub fn get_or_create_category(&mut self, path: &CategoryPath) -> &mut Vec<Item> {
+    pub fn get_or_create_category(
+        &mut self,
+        names: &[String],
+        path: &CategoryPath,
+    ) -> &mut Vec<Item> {
         let mut current_items = &mut self.children;
 
-        for category_name in path.iter_segments() {
+        for (category_name, _category_slug) in names.iter().zip(path.iter_segments()) {
             let position = current_items.iter().position(|item| {
                 if let Item::Category(cat) = item {
                     cat.name == *category_name

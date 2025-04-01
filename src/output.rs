@@ -198,8 +198,7 @@ impl Gallery {
                 .map(|s| format!("{root_url}{}", s.trim_end_matches("index.html")))
                 .collect::<Vec<_>>();
             pages.sort();
-            let sitemap = 
-                pages.join("\n");
+            let sitemap = pages.join("\n");
             ret.insert(
                 "/sitemap.txt".to_owned(),
                 LazyLock::new(Box::new(move || sitemap.into_bytes())),

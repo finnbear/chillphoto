@@ -102,11 +102,16 @@ fn main() {
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
         let name = entry.matched().complete().to_owned();
-        let (categories, name) = if let Some((categories, name)) = name.rsplit_once('/') {
-            (CategoryPath::new(categories), name)
-        } else {
-            (CategoryPath::ROOT, name.as_str())
-        };
+        let (category_names, categories, name) =
+            if let Some((categories, name)) = name.rsplit_once('/') {
+                let category_names = categories
+                    .split('/')
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                (category_names, CategoryPath::new(categories), name)
+            } else {
+                (Vec::new(), CategoryPath::ROOT, name.as_str())
+            };
 
         let name_no_extension = name.rsplit_once('.').unwrap().0.to_owned();
 
@@ -134,7 +139,9 @@ fn main() {
         if let Some(format) = page_format {
             let file = std::fs::read_to_string(entry.path()).unwrap();
             let mut gallery = gallery.lock().unwrap();
-            let to_insert = gallery.gallery.get_or_create_category(&categories);
+            let to_insert = gallery
+                .gallery
+                .get_or_create_category(&category_names, &categories);
             to_insert.push(Item::Page(Page {
                 name: name_no_extension,
                 description: None,
@@ -167,7 +174,9 @@ fn main() {
             file_date: metadata.modified().or(metadata.created()).ok(),
         };
 
-        let to_insert = gallery.gallery.get_or_create_category(&categories);
+        let to_insert = gallery
+            .gallery
+            .get_or_create_category(&category_names, &categories);
         to_insert.push(Item::Photo(photo));
     });
 
@@ -182,7 +191,7 @@ fn main() {
     let mut pages = 0usize;
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
-            if let Some(config) = item_configs.remove(&path.push(category.name.clone())) {
+            if let Some(config) = item_configs.remove(&path.push(category.slug())) {
                 let config = toml::from_str::<CategoryConfig>(&config).unwrap();
                 category.config = config;
                 category_configs += 1;
