@@ -107,7 +107,12 @@ impl GalleryConfig {
     }
 
     pub fn photo_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
+        let base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
+        if PUBLIC {
+            base
+        } else {
+            format!("{base}index.html")
+        }
     }
 
     pub fn preview<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
@@ -150,7 +155,12 @@ impl GalleryConfig {
     }
 
     pub fn page_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        format!("{}.html", self.variation::<PUBLIC>(category, name, ""))
+        let base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
+        if PUBLIC {
+            base
+        } else {
+            format!("{base}index.html")
+        }
     }
 
     pub fn index_html<const PUBLIC: bool>(&self) -> String {
