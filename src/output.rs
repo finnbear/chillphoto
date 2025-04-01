@@ -192,12 +192,14 @@ impl Gallery {
         );
 
         if let Some(root_url) = &self.config.root_url {
-            let sitemap = ret
+            let mut pages = ret
                 .keys()
                 .filter(|k| k.ends_with('/') || k.ends_with(".html"))
-                .map(|s| format!("{root_url}{s}"))
-                .collect::<Vec<_>>()
-                .join("\n");
+                .map(|s| format!("{root_url}{}", s.trim_end_matches("index.html")))
+                .collect::<Vec<_>>();
+            pages.sort();
+            let sitemap = 
+                pages.join("\n");
             ret.insert(
                 "/sitemap.txt".to_owned(),
                 LazyLock::new(Box::new(move || sitemap.into_bytes())),
