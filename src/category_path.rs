@@ -10,6 +10,7 @@ impl CategoryPath {
         segments: Vec::new(),
     };
 
+    #[track_caller]
     pub fn new(path: &str) -> Self {
         if path == "" {
             Self {
@@ -17,7 +18,13 @@ impl CategoryPath {
             }
         } else {
             Self {
-                segments: path.split('/').map(|s| s.to_owned()).collect(),
+                segments: path
+                    .split('/')
+                    .map(|s| {
+                        assert!(!s.contains(' '));
+                        s.to_owned()
+                    })
+                    .collect(),
             }
         }
     }

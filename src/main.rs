@@ -108,7 +108,14 @@ fn main() {
                     .split('/')
                     .map(|s| s.to_owned())
                     .collect::<Vec<String>>();
-                (category_names, CategoryPath::new(categories), name)
+                let path = CategoryPath::new(
+                    &category_names
+                        .iter()
+                        .map(|n| n.replace(' ', "-"))
+                        .collect::<Vec<_>>()
+                        .join("/"),
+                );
+                (category_names, path, name)
             } else {
                 (Vec::new(), CategoryPath::ROOT, name.as_str())
             };
