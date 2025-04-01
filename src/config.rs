@@ -1,9 +1,9 @@
-use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty, CONFIG};
+use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Config {
+pub struct GalleryConfig {
     #[serde(default = "default_input")]
     pub input: String,
     #[serde(default = "default_output")]
@@ -69,7 +69,7 @@ fn default_output() -> String {
     String::from("./output")
 }
 
-impl Config {
+impl GalleryConfig {
     pub fn subdirectory(&self, subdirectory: &str) -> String {
         Path::new(&self.output)
             .join(Path::new(subdirectory))
@@ -101,7 +101,7 @@ impl Config {
         format!(
             "{}.{}",
             self.variation::<PUBLIC>(category, name, ""),
-            CONFIG.photo_format
+            self.photo_format
         )
     }
 
@@ -113,7 +113,7 @@ impl Config {
         format!(
             "{}.{}",
             self.variation::<PUBLIC>(category, name, "_preview"),
-            CONFIG.preview_format
+            self.preview_format
         )
     }
 
@@ -121,15 +121,17 @@ impl Config {
         format!(
             "{}.{}",
             self.variation::<PUBLIC>(category, name, "_thumbnail"),
-            CONFIG.thumbnail_format
+            self.thumbnail_format
         )
     }
 
     pub fn category_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        format!(
-            "{}/index.html",
-            self.variation::<PUBLIC>(category, name, "")
-        )
+        let base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
+        if PUBLIC {
+            base
+        } else {
+            format!("{base}index.html",)
+        }
     }
 
     pub fn favicon<const PUBLIC: bool>(&self) -> String {
@@ -151,10 +153,7 @@ impl Config {
     }
 
     pub fn index_html<const PUBLIC: bool>(&self) -> String {
-        format!(
-            "{}.html",
-            self.variation::<PUBLIC>(&CategoryPath::ROOT, "index", "")
-        )
+        if PUBLIC { "/" } else { "/index.html" }.to_owned()
     }
 }
 

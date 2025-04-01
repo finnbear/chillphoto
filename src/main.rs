@@ -1,7 +1,7 @@
 use category_path::CategoryPath;
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
-use config::{CategoryConfig, Config, PhotoConfig};
+use config::{CategoryConfig, GalleryConfig, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use photo::Photo;
@@ -11,7 +11,7 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
-use std::sync::{LazyLock, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use util::remove_dir_contents;
 use wax::Glob;
@@ -24,12 +24,6 @@ mod output;
 mod photo;
 mod serve;
 mod util;
-
-pub static CONFIG: LazyLock<Config> = LazyLock::new(|| {
-    let config_text =
-        fs::read_to_string("./chillphoto.toml").expect("couldn't read ./chillphoto.toml");
-    toml::from_str::<Config>(&config_text).unwrap()
-});
 
 #[derive(Parser)]
 #[clap(name = "chillphoto", version)]
@@ -54,7 +48,7 @@ fn main() {
     let args = Args::parse();
 
     if matches!(args.command, Command::Init) {
-        let config = toml::from_str::<Config>("").unwrap();
+        let config = toml::from_str::<GalleryConfig>("").unwrap();
         let string = toml::to_string(&config).unwrap();
         let mut file = fs::OpenOptions::new()
             .create_new(true)
@@ -67,8 +61,9 @@ fn main() {
         return;
     }
 
-    LazyLock::force(&CONFIG);
-    let config = &*CONFIG;
+    let config_text =
+        fs::read_to_string("./chillphoto.toml").expect("couldn't read ./chillphoto.toml");
+    let config = toml::from_str::<GalleryConfig>(&config_text).unwrap();
 
     let mut input_path_string = config.input.clone();
     if let Some(remainder) = input_path_string.strip_prefix("~/") {
@@ -89,19 +84,20 @@ fn main() {
         item_configs: HashMap<CategoryPath, String>,
     }
 
-    let gallery = Mutex::new(GalleryExtras {
-        gallery: Gallery {
-            children: Vec::new(),
-            favicon: None,
-        },
-        item_configs: HashMap::new(),
-    });
-
     let entries = glob
         .walk(root)
         .not([config.output.as_str()])
         .unwrap()
         .collect::<Vec<_>>();
+
+    let gallery = Mutex::new(GalleryExtras {
+        gallery: Gallery {
+            children: Vec::new(),
+            favicon: None,
+            config,
+        },
+        item_configs: HashMap::new(),
+    });
 
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
@@ -118,9 +114,10 @@ fn main() {
             let config_text = fs::read_to_string(entry.path()).expect("couldn't read photo config");
 
             let mut gallery = gallery.lock().unwrap();
-            gallery
-                .item_configs
-                .insert(categories.push(name_no_extension), config_text);
+            gallery.item_configs.insert(
+                categories.push(name_no_extension.replace(' ', "_")),
+                config_text,
+            );
             return;
         }
 
@@ -179,13 +176,16 @@ fn main() {
         mut item_configs,
     } = gallery.into_inner().unwrap();
     let mut categories = 0usize;
+    let mut category_configs = 0usize;
     let mut photos = 0usize;
+    let mut photo_configs = 0usize;
     let mut pages = 0usize;
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
             if let Some(config) = item_configs.remove(&path.push(category.name.clone())) {
                 let config = toml::from_str::<CategoryConfig>(&config).unwrap();
                 category.config = config;
+                category_configs += 1;
             }
 
             let mut matches = Vec::<(String, RichText)>::new();
@@ -228,9 +228,11 @@ fn main() {
             categories += 1;
         }
         Item::Photo(photo) => {
-            if let Some(config) = item_configs.remove(&path.push(photo.name.clone())) {
-                let config = toml::from_str::<PhotoConfig>(&config).unwrap();
+            let path = path.push(photo.name.clone());
+            if let Some(config) = item_configs.remove(&path) {
+                let config = toml::from_str::<PhotoConfig>(&config).expect(&path.to_string());
                 photo.config = config;
+                photo_configs += 1;
             }
             photos += 1;
         }
@@ -276,7 +278,7 @@ fn main() {
 
     //println!("{gallery:?}");
     println!(
-        "({:.1}s) Found {photos} photos in {categories} categories, and {pages} pages",
+        "({:.1}s) Found {photos} photos ({photo_configs} with config) in {categories} categories ({category_configs} with config), and {pages} pages",
         start.elapsed().as_secs_f32()
     );
 
@@ -290,12 +292,12 @@ fn main() {
     if matches!(args.command, Command::Serve) {
         serve(start, &output);
     } else {
-        if fs::exists(&config.output).unwrap() {
-            remove_dir_contents(&config.output).expect("failed to clear output directory");
+        if fs::exists(&gallery.config.output).unwrap() {
+            remove_dir_contents(&gallery.config.output).expect("failed to clear output directory");
         }
 
         output.par_iter().for_each(|(path, generator)| {
-            let path = config.subdirectory(path.strip_prefix('/').unwrap());
+            let path = gallery.config.subdirectory(path.strip_prefix('/').unwrap());
             let contents = &**generator;
             if let Some((dir, _)) = path.rsplit_once('/') {
                 std::fs::create_dir_all(dir).unwrap();
@@ -306,7 +308,7 @@ fn main() {
         println!(
             "({:.1}s) Saved website to {}",
             start.elapsed().as_secs_f32(),
-            config.output
+            gallery.config.output
         );
     }
 }

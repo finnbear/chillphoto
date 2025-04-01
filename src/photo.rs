@@ -1,4 +1,8 @@
-use crate::{config::PhotoConfig, exif::ExifData, gallery::RichText, CONFIG};
+use crate::{
+    config::{GalleryConfig, PhotoConfig},
+    exif::ExifData,
+    gallery::RichText,
+};
 use chrono::{DateTime, NaiveDate};
 use image::{
     imageops::{self, FilterType},
@@ -32,21 +36,21 @@ impl Photo {
         })
     }
 
-    pub fn image_dimensions(&self) -> (u32, u32) {
+    pub fn image_dimensions(&self, config: &GalleryConfig) -> (u32, u32) {
         if let Some((width, height)) = self.exif.dimensions().filter(|_| !self.exif.oriented()) {
             // Avoid decoding the image if we don't have to.
             resize_dimensions(
                 width,
                 height,
-                CONFIG.photo_resolution,
-                CONFIG.photo_resolution,
+                config.photo_resolution,
+                config.photo_resolution,
             )
         } else {
-            self.image().dimensions()
+            self.image(config).dimensions()
         }
     }
 
-    pub fn image(&self) -> &RgbImage {
+    pub fn image(&self, config: &GalleryConfig) -> &RgbImage {
         self.image.get_or_init(|| {
             let mut decoder = ImageReader::new(io::Cursor::new(&self.input_image_data))
                 .with_guessed_format()
@@ -60,28 +64,28 @@ impl Photo {
                 image.apply_orientation(orientation);
             }
 
-            resize_image(&image.to_rgb8(), CONFIG.photo_resolution)
+            resize_image(&image.to_rgb8(), config.photo_resolution)
         })
     }
 
-    pub fn preview_dimensions(&self) -> (u32, u32) {
-        let (width, height) = self.image_dimensions();
+    pub fn preview_dimensions(&self, config: &GalleryConfig) -> (u32, u32) {
+        let (width, height) = self.image_dimensions(config);
         resize_dimensions(
             width,
             height,
-            CONFIG.preview_resolution,
-            CONFIG.preview_resolution,
+            config.preview_resolution,
+            config.preview_resolution,
         )
     }
 
-    pub fn preview(&self) -> &RgbImage {
+    pub fn preview(&self, config: &GalleryConfig) -> &RgbImage {
         self.preview
-            .get_or_init(|| resize_image(self.image(), CONFIG.preview_resolution))
+            .get_or_init(|| resize_image(self.image(config), config.preview_resolution))
     }
 
-    pub fn thumbnail(&self) -> &RgbImage {
+    pub fn thumbnail(&self, config: &GalleryConfig) -> &RgbImage {
         self.thumbnail
-            .get_or_init(|| generate_thumbnail(self.image(), &self.config))
+            .get_or_init(|| generate_thumbnail(config, self.image(config), &self.config))
     }
 }
 
@@ -90,7 +94,7 @@ impl Debug for Photo {
         f.debug_struct("Photo")
             .field("name", &self.name)
             .field("exif", &self.exif)
-            .field("resolution", &(self.image().width(), self.image().height()))
+            .field("resolution", &self.exif.dimensions())
             .finish_non_exhaustive()
     }
 }
@@ -122,7 +126,11 @@ fn resize_dimensions(width: u32, height: u32, nwidth: u32, nheight: u32) -> (u32
     }
 }
 
-fn generate_thumbnail(img: &RgbImage, photo_config: &PhotoConfig) -> RgbImage {
+fn generate_thumbnail(
+    config: &GalleryConfig,
+    img: &RgbImage,
+    photo_config: &PhotoConfig,
+) -> RgbImage {
     let (width, height) = img.dimensions();
     let (size, x_offset, y_offset) = if false {
         let size = width.min(height);
@@ -147,8 +155,8 @@ fn generate_thumbnail(img: &RgbImage, photo_config: &PhotoConfig) -> RgbImage {
     let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size);
     imageops::resize(
         &*cropped,
-        CONFIG.thumbnail_resolution,
-        CONFIG.thumbnail_resolution,
+        config.thumbnail_resolution,
+        config.thumbnail_resolution,
         FilterType::Lanczos3,
     )
 }

@@ -69,6 +69,7 @@ thumbnail_crop_center = {
 - [x] Full, preview, and thumbnail sizes
 - [x] Arbitrarily-nested photo categories
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
+- [ ] Sitemap
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling

@@ -2,7 +2,6 @@ use crate::{
     category_path::CategoryPath,
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
-    CONFIG,
 };
 use image::{ImageFormat, RgbImage};
 use serde::Serialize;
@@ -13,7 +12,7 @@ impl Gallery {
     pub fn output<'a>(
         &'a self,
     ) -> HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>> {
-        let config = &*CONFIG;
+        let config = &self.config;
 
         // TODO: nested pages.
         let page_items = self
@@ -50,20 +49,22 @@ impl Gallery {
                     let photo_path = config.photo::<false>(&path, &photo.name);
                     ret.insert(
                         photo_path.clone(),
-                        LazyLock::new(Box::new(move || write_image(photo.image(), &photo_path))),
+                        LazyLock::new(Box::new(move || {
+                            write_image(photo.image(&self.config), &photo_path)
+                        })),
                     );
                     let preview_path = config.preview::<false>(&path, &photo.name);
                     ret.insert(
                         preview_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.preview(), &preview_path)
+                            write_image(photo.preview(&self.config), &preview_path)
                         })),
                     );
                     let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
                     ret.insert(
                         thumbnail_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.thumbnail(), &thumbnail_path)
+                            write_image(photo.thumbnail(&self.config), &thumbnail_path)
                         })),
                     );
 
@@ -83,8 +84,8 @@ impl Gallery {
                                     >
                                         <img
                                             class="preview"
-                                            width={photo.preview_dimensions().0.to_string()}
-                                            height={photo.preview_dimensions().1.to_string()}
+                                            width={photo.preview_dimensions(config).0.to_string()}
+                                            height={photo.preview_dimensions(config).1.to_string()}
                                             alt={photo.name.clone()}
                                             src={config.preview::<true>(&path, &photo.name)}
                                         />
@@ -129,7 +130,7 @@ impl Gallery {
                                 title: category.name.clone().into(),
                                 description: category.description.clone().map(|d| d.into()),
                                 head: Default::default(),
-                                body: render_items(&category_path, &category.children),
+                                body: render_items(self, &category_path, &category.children),
                                 pages: page_items,
                                 path: category_path.clone(),
                                 relative: None,
@@ -175,14 +176,14 @@ impl Gallery {
         );
 
         ret.insert(
-            CONFIG.index_html::<false>(),
+            self.config.index_html::<false>(),
             LazyLock::new(Box::new(move || {
                 render_html(AppProps {
                     gallery: self,
-                    title: config.title.clone().into(),
-                    description: CONFIG.description.clone().map(|d| d.into()),
+                    title: self.config.title.clone().into(),
+                    description: self.config.description.clone().map(|d| d.into()),
                     head: Default::default(),
-                    body: render_items(&CategoryPath::ROOT, &self.children),
+                    body: render_items(self, &CategoryPath::ROOT, &self.children),
                     pages: page_items,
                     path: CategoryPath::ROOT,
                     relative: None,
@@ -202,7 +203,7 @@ pub struct RelativeNavigation {
     next: Option<String>,
 }
 
-fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
+fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item]) -> Html {
     html! {
         {items.iter().filter_map(|child| {
             match child {
@@ -210,15 +211,15 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                     Some(html!{
                         <a
                             class="thumbnail_container"
-                            href={CONFIG.photo_html::<true>(&category_path, &photo.name)}
+                            href={gallery.config.photo_html::<true>(&category_path, &photo.name)}
                         >
                             <img
                                 alt={photo.name.clone()}
-                                src={CONFIG.thumbnail::<true>(&category_path, &photo.name)}
+                                src={gallery.config.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
                                     "width: {}px; height: {}px;",
-                                    CONFIG.thumbnail_resolution,
-                                    CONFIG.thumbnail_resolution
+                                    gallery.config.thumbnail_resolution,
+                                    gallery.config.thumbnail_resolution
                                 )}
                                 class="thumbnail"
                             />
@@ -238,17 +239,17 @@ fn render_items(category_path: &CategoryPath, items: &[Item]) -> Html {
                     Some(html!{
                         <a
                             class="thumbnail_container category_item"
-                            href={CONFIG.category_html::<true>(&category_path, &category.slug())}
+                            href={gallery.config.category_html::<true>(&category_path, &category.slug())}
                         >
                             <img
                                 class="thumbnail"
                                 style={format!(
                                     "width: {}px; height: {}px;",
-                                    CONFIG.thumbnail_resolution,
-                                    CONFIG.thumbnail_resolution
+                                    gallery.config.thumbnail_resolution,
+                                    gallery.config.thumbnail_resolution
                                 )}
                                 alt={photo.name.clone()}
-                                src={CONFIG.thumbnail::<true>(&photo_path, &photo.name)}
+                                src={gallery.config.thumbnail::<true>(&photo_path, &photo.name)}
                             />
                             <div class="category_item_info">
                                 <h2 class="category_item_name">
@@ -510,10 +511,10 @@ pub fn app(props: AppProps<'_>) -> Html {
                 if let Some(description) = props.description.clone() {
                     <meta name="description" content={description}/>
                 }
-                if !CONFIG.categories.is_empty() {
-                    <meta name="keywords" content={CONFIG.categories.join(",")}/>
+                if !props.gallery.config.categories.is_empty() {
+                    <meta name="keywords" content={props.gallery.config.categories.join(",")}/>
                 }
-                if let Some(author) = CONFIG.author.clone() {
+                if let Some(author) = props.gallery.config.author.clone() {
                     <meta name="author" content={author}/>
                 }
                 <meta name="generator" content="chillphoto"/>
@@ -529,7 +530,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             <body>
                 <div id="page">
                     <header id="header">
-                        <h1 id="title">{CONFIG.title.clone()}</h1>
+                        <h1 id="title">{props.gallery.config.title.clone()}</h1>
                         if let Some(relative) = &props.relative {
                             <div id="relative_navigation">
                                 <a
@@ -555,9 +556,9 @@ pub fn app(props: AppProps<'_>) -> Html {
                                 <a
                                     class={"breadcrumb"}
                                     href={if path.is_root() {
-                                        CONFIG.index_html::<true>()
+                                        props.gallery.config.index_html::<true>()
                                     } else {
-                                        CONFIG.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
+                                        props.gallery.config.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
                                     }}
                                 >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
                             }
@@ -595,10 +596,10 @@ pub fn app(props: AppProps<'_>) -> Html {
                         </aside>
                     </div>
                     <footer id="footer">
-                        {join(&CONFIG.author.as_ref().map(|author| {
+                        {join(&props.gallery.config.author.as_ref().map(|author| {
                             {html!{<>
                                 {"Published by "}
-                                if let Some(href) = CONFIG.author_url.clone() {
+                                if let Some(href) = props.gallery.config.author_url.clone() {
                                     <a {href}>{author}</a>
                                 } else {
                                     {author}
@@ -666,7 +667,7 @@ pub fn rich_text_html(text: &RichText) -> Html {
     }
 }
 
-fn write_manifest(_gallery: &Gallery) -> Vec<u8> {
+fn write_manifest(gallery: &Gallery) -> Vec<u8> {
     #[derive(Serialize)]
     struct Manifest {
         name: String,
@@ -680,10 +681,10 @@ fn write_manifest(_gallery: &Gallery) -> Vec<u8> {
     }
 
     let manifest = Manifest {
-        name: CONFIG.title.clone(),
-        description: CONFIG.description.clone(),
+        name: gallery.config.title.clone(),
+        description: gallery.config.description.clone(),
         display: "standalone".to_owned(),
-        categories: CONFIG.categories.clone(),
+        categories: gallery.config.categories.clone(),
         start_url: "/".to_owned(),
         handle_links: "not-preferred".to_owned(),
     };

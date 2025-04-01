@@ -111,14 +111,12 @@ pub fn serve(
                     }
                 };
 
-                let response = if request.uri().path().ends_with('/') {
-                    http::Response::builder()
-                        .version(request.version())
-                        .status(307)
-                        .header("Location", format!("{}index.html", request.uri().path()))
-                        .body(Vec::new())
-                        .unwrap()
-                } else if let Some(file) = output.get(request.uri().path()) {
+                let mut path = request.uri().path().to_owned();
+                if path.ends_with('/') {
+                    path.push_str("index.html")
+                }
+
+                let response = if let Some(file) = output.get(&path) {
                     http::Response::builder()
                         .version(request.version())
                         .status(200)

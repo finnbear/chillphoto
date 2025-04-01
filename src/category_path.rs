@@ -17,7 +17,7 @@ impl CategoryPath {
             }
         } else {
             Self {
-                segments: path.split('/').map(|s| s.to_owned()).collect(),
+                segments: path.split('/').map(|s| s.replace(' ', "_")).collect(),
             }
         }
     }
@@ -35,7 +35,9 @@ impl CategoryPath {
         }
     }
 
+    #[track_caller]
     pub fn push(&self, segment: String) -> Self {
+        assert!(!segment.contains(' '), "{}", segment);
         let mut segments = self.segments.clone();
         segments.push(segment);
         Self { segments }
@@ -58,6 +60,7 @@ impl CategoryPath {
         self.to_string()
     }
 
+    #[allow(unused)]
     pub fn to_string_with_leading_slash(&self) -> String {
         format!("/{self}")
     }

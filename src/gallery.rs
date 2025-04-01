@@ -1,6 +1,10 @@
 use std::sync::OnceLock;
 
-use crate::{category_path::CategoryPath, config::CategoryConfig, photo::Photo};
+use crate::{
+    category_path::CategoryPath,
+    config::{CategoryConfig, GalleryConfig},
+    photo::Photo,
+};
 use chrono::NaiveDate;
 use image::RgbImage;
 
@@ -8,6 +12,7 @@ use image::RgbImage;
 pub struct Gallery {
     pub children: Vec<Item>,
     pub favicon: Option<(Vec<u8>, OnceLock<RgbImage>)>,
+    pub config: GalleryConfig,
 }
 
 impl Gallery {
