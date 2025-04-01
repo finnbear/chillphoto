@@ -161,6 +161,8 @@ impl GalleryConfig {
 #[derive(Deserialize, Debug)]
 pub struct PhotoConfig {
     #[serde(default)]
+    pub alt_text: Option<String>,
+    #[serde(default)]
     pub order: i64,
     #[serde(default = "default_thumbnail_crop_factor")]
     pub thumbnail_crop_factor: f64,

@@ -86,7 +86,7 @@ impl Gallery {
                                             class="preview"
                                             width={photo.preview_dimensions(config).0.to_string()}
                                             height={photo.preview_dimensions(config).1.to_string()}
-                                            alt={photo.name.clone()}
+                                            alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
                                             src={config.preview::<true>(&path, &photo.name)}
                                         />
                                     </a>
@@ -228,7 +228,8 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                             href={gallery.config.photo_html::<true>(&category_path, &photo.name)}
                         >
                             <img
-                                alt={photo.name.clone()}
+                                title={photo.name.clone()}
+                                alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
                                 src={gallery.config.thumbnail::<true>(&category_path, &photo.name)}
                                 style={format!(
                                     "width: {}px; height: {}px;",
@@ -512,6 +513,7 @@ pub fn app(props: AppProps<'_>) -> Html {
 
         .thumbnail, .preview {
             background-color: #282828;
+            font-size: 0.5rem;
         }
     "#
         .into(),
@@ -537,6 +539,14 @@ pub fn app(props: AppProps<'_>) -> Html {
                 }
                 <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                if let Some(relative) = &props.relative {
+                    if let Some(previous) = &relative.previous {
+                        <link rel="prerender" href={previous.clone()}/>
+                    }
+                    if let Some(next) = &relative.next {
+                        <link rel="prerender" href={next.clone()}/>
+                    }
+                }
                 // Favicon
                 {props.head.clone()}
                 <style>{style}</style>
