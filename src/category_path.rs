@@ -17,7 +17,7 @@ impl CategoryPath {
             }
         } else {
             Self {
-                segments: path.split('/').map(|s| s.replace(' ', "_")).collect(),
+                segments: path.split('/').map(|s| s.replace(' ', "-")).collect(),
             }
         }
     }

@@ -115,7 +115,7 @@ fn main() {
 
             let mut gallery = gallery.lock().unwrap();
             gallery.item_configs.insert(
-                categories.push(name_no_extension.replace(' ', "_")),
+                categories.push(name_no_extension.replace(' ', "-")),
                 config_text,
             );
             return;

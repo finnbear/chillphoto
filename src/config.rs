@@ -11,6 +11,7 @@ pub struct GalleryConfig {
     #[serde(default = "default_title")]
     pub title: String,
     pub author: Option<String>,
+    pub root_url: Option<String>,
     pub author_url: Option<String>,
     pub description: Option<String>,
     #[serde(default = "default_categories")]
