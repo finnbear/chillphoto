@@ -48,6 +48,10 @@ thumbnail = "Photo1"
 ### Photo config
 
 ```toml
+# optional override
+author = "Full Name"
+# optional override
+license_url = "https://creativecommons.org/licenses/by-sa/4.0/deed.en"
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0

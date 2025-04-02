@@ -13,6 +13,7 @@ pub struct GalleryConfig {
     pub author: Option<String>,
     pub root_url: Option<String>,
     pub author_url: Option<String>,
+    pub license_url: Option<String>,
     pub description: Option<String>,
     #[serde(default)]
     pub disallow_ai_training: bool,
@@ -172,6 +173,11 @@ impl GalleryConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct PhotoConfig {
+    /// Author override.
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub license_url: Option<String>,
     #[serde(default)]
     pub alt_text: Option<String>,
     #[serde(default)]
