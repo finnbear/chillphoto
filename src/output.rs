@@ -292,6 +292,7 @@ impl Gallery {
                 if self.config.disallow_ai_training {
                     writeln!(robots_txt, "DisallowAITraining: /").unwrap();
                 }
+                writeln!(robots_txt, "Allow: /").unwrap();
                 if let Some(url) = &self.config.root_url {
                     writeln!(robots_txt, "Sitemap: {url}/sitemap.txt").unwrap();
                 }
