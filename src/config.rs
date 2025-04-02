@@ -14,6 +14,8 @@ pub struct GalleryConfig {
     pub root_url: Option<String>,
     pub author_url: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    pub disallow_ai_training: bool,
     #[serde(default = "default_categories")]
     pub categories: Vec<String>,
     #[serde(default = "default_photo_format")]

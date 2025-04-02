@@ -70,6 +70,7 @@ thumbnail_crop_center = {
 - [x] Arbitrarily-nested photo categories
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Sitemap
+- [x] Structured data
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling

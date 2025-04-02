@@ -3,9 +3,10 @@ use crate::{
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
 };
+use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
 use serde::Serialize;
-use std::{collections::HashMap, io::Cursor, sync::LazyLock};
+use std::{collections::HashMap, fmt::Write, io::Cursor, sync::LazyLock};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
 impl Gallery {
@@ -72,11 +73,41 @@ impl Gallery {
                     ret.insert(
                         config.photo_html::<false>(&path, &photo.name),
                         LazyLock::new(Box::new(move || {
+                            /// https://schema.org/ImageObject
+                            #[derive(Serialize)]
+                            struct PhotoStructuredData {
+                                #[serde(rename = "@context")]
+                                context: &'static str,
+                                #[serde(rename = "@type")]
+                                _type: &'static str,
+                                content_url: String,
+                                name: String,
+                                #[serde(skip_serializing_if = "Option::is_none")]
+                                description: Option<String>,
+                                #[serde(skip_serializing_if = "Option::is_none")]
+                                date_created: Option<String>,
+                                #[serde(skip_serializing_if = "Option::is_none")]
+                                copyright_holder: Option<String>,
+                                #[serde(skip_serializing_if = "Option::is_none")]
+                                copyright_year: Option<i32>,
+                            }
+
+                            let photo_structured_data = write_structured_data(PhotoStructuredData{
+                                context: "https://schema.org",
+                                _type: "ImageObject",
+                                content_url: self.config.preview::<true>(&path, &photo.name),
+                                name: photo.name.clone(),
+                                description: photo.config.alt_text.clone(),
+                                date_created: photo.date().map(|d| d.to_string()),
+                                copyright_holder: self.config.author.clone(),
+                                copyright_year: photo.date().map(|d| d.year()),
+                            });
+
                             render_html(AppProps {
                                 gallery: self,
                                 title: photo.name.clone().into(),
-                                description: None,
-                                head: Default::default(),
+                                description: photo.config.alt_text.clone().map(|s| s.into()),
+                                head: photo_structured_data,
                                 body: html! {<>
                                     <a
                                         class="preview_container"
@@ -178,11 +209,36 @@ impl Gallery {
         ret.insert(
             self.config.index_html::<false>(),
             LazyLock::new(Box::new(move || {
+                /// https://schema.org/WebSite
+                #[derive(Serialize)]
+                struct WebSiteStructuredData {
+                    #[serde(rename = "@context")]
+                    context: &'static str,
+                    #[serde(rename = "@type")]
+                    _type: &'static str,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    url: Option<String>,
+                    name: String,
+                    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+                    description: Option<String>,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    copyright_holder: Option<String>,
+                }
+
+                let website_structured_data = write_structured_data(WebSiteStructuredData {
+                    context: "https://schema.org",
+                    _type: "WebSite",
+                    url: self.config.root_url.clone(),
+                    name: self.config.title.clone(),
+                    description: self.config.description.clone(),
+                    copyright_holder: self.config.author.clone(),
+                });
+
                 render_html(AppProps {
                     gallery: self,
                     title: self.config.title.clone().into(),
                     description: self.config.description.clone().map(|d| d.into()),
-                    head: Default::default(),
+                    head: website_structured_data,
                     body: render_items(self, &CategoryPath::ROOT, &self.children),
                     pages: page_items,
                     path: CategoryPath::ROOT,
@@ -204,6 +260,21 @@ impl Gallery {
                 LazyLock::new(Box::new(move || sitemap.into_bytes())),
             );
         }
+
+        ret.insert(
+            "/robots.txt".to_owned(),
+            LazyLock::new(Box::new(move || {
+                let mut robots_txt = String::new();
+                writeln!(robots_txt, "User-agent: *").unwrap();
+                if self.config.disallow_ai_training {
+                    writeln!(robots_txt, "DisallowAITraining: /").unwrap();
+                }
+                if let Some(url) = &self.config.root_url {
+                    writeln!(robots_txt, "Sitemap: {url}/sitemap.txt").unwrap();
+                }
+                robots_txt.into_bytes()
+            })),
+        );
 
         ret
     }
@@ -537,6 +608,9 @@ pub fn app(props: AppProps<'_>) -> Html {
                 if props.gallery.favicon.is_some() {
                     <link rel="icon" type="image/png" href="/favicon.png"/>
                 }
+                if props.gallery.config.disallow_ai_training {
+                    <meta name="robots" content="DisallowAITraining"/>
+                }
                 <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 if let Some(relative) = &props.relative {
@@ -714,4 +788,18 @@ fn write_manifest(gallery: &Gallery) -> Vec<u8> {
     };
 
     serde_json::to_string(&manifest).unwrap().into_bytes()
+}
+
+pub fn write_structured_data(data: impl Serialize) -> Html {
+    Html::from_html_unchecked(
+        format!(
+            r#"
+        <script type="application/ld+json">
+        {}
+        </script>
+    "#,
+            serde_json::to_string_pretty(&data).unwrap()
+        )
+        .into(),
+    )
 }
