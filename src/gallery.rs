@@ -13,6 +13,7 @@ pub struct Gallery {
     pub children: Vec<Item>,
     pub favicon: Option<(Vec<u8>, OnceLock<RgbImage>)>,
     pub config: GalleryConfig,
+    pub head_html: Option<String>,
 }
 
 impl Gallery {

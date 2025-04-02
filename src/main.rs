@@ -95,6 +95,7 @@ fn main() {
             children: Vec::new(),
             favicon: None,
             config,
+            head_html: None,
         },
         item_configs: HashMap::new(),
     });
@@ -146,6 +147,10 @@ fn main() {
         if let Some(format) = page_format {
             let file = std::fs::read_to_string(entry.path()).unwrap();
             let mut gallery = gallery.lock().unwrap();
+            if name_no_extension == "head" && matches!(format, RichTextFormat::Html) {
+                gallery.gallery.head_html = Some(file);
+                return;
+            }
             let to_insert = gallery
                 .gallery
                 .get_or_create_category(&category_names, &categories);

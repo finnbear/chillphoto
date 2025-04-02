@@ -647,6 +647,12 @@ pub fn app(props: AppProps<'_>) -> Html {
                 }
                 // Favicon
                 {props.head.clone()}
+                if let Some(content) = props.gallery.head_html.clone() {
+                    {rich_text_html(&RichText{
+                        content,
+                        format: RichTextFormat::Html,
+                    })}
+                }
                 <style>{style}</style>
             </head>
             <body>
