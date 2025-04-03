@@ -198,9 +198,45 @@ fn main() {
     } = gallery.into_inner().unwrap();
     let mut categories = 0usize;
     let mut category_configs = 0usize;
+    let mut category_texts = 0usize;
     let mut photos = 0usize;
     let mut photo_configs = 0usize;
+    let mut photo_texts = 0usize;
     let mut pages = 0usize;
+    let mut match_pages = |children: &mut Vec<Item>| {
+        let mut matches = Vec::<(String, RichText)>::new();
+        for name in children
+            .iter()
+            .filter_map(|i| i.photo().map(|p| &p.name).or(i.category().map(|c| &c.name)))
+        {
+            for page in children.iter().filter_map(|i| i.page()) {
+                if *name == page.name {
+                    matches.push((name.clone(), page.text.clone()));
+                }
+            }
+        }
+        for (name, text) in matches {
+            children.retain_mut(|child| {
+                match child {
+                    Item::Photo(photo) => {
+                        if photo.name == name {
+                            photo.text = Some(text.clone());
+                            photo_texts += 1;
+                        }
+                    }
+                    Item::Category(category) => {
+                        if category.name == name {
+                            category.text = Some(text.clone());
+                            category_texts += 1;
+                        }
+                    }
+                    Item::Page(page) => return page.name != name,
+                }
+                true
+            });
+        }
+    };
+    match_pages(&mut gallery.children);
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
             if let Some(config) = item_configs.remove(&path.push(category.slug())) {
@@ -209,28 +245,7 @@ fn main() {
                 category_configs += 1;
             }
 
-            let mut matches = Vec::<(String, RichText)>::new();
-            for photo in category.children.iter().filter_map(|i| i.photo()) {
-                for page in category.children.iter().filter_map(|i| i.page()) {
-                    if photo.name == page.name {
-                        matches.push((photo.name.clone(), page.text.clone()));
-                    }
-                }
-            }
-            for (name, text) in matches {
-                category.children.retain_mut(|child| {
-                    match child {
-                        Item::Photo(photo) => {
-                            if photo.name == name {
-                                photo.text = Some(text.clone());
-                            }
-                        }
-                        Item::Page(page) => return page.name != name,
-                        _ => {}
-                    }
-                    true
-                });
-            }
+            match_pages(&mut category.children);
 
             let mut first_date = Option::<NaiveDate>::None;
 
@@ -299,7 +314,7 @@ fn main() {
 
     //println!("{gallery:?}");
     println!(
-        "({:.1}s) Found {photos} photos ({photo_configs} with config) in {categories} categories ({category_configs} with config), and {pages} pages",
+        "({:.1}s) Found {photos} photos ({photo_configs} with config, {photo_texts} with caption) in {categories} categories ({category_configs} with config, {category_texts} with caption), and {pages} pages",
         start.elapsed().as_secs_f32()
     );
 

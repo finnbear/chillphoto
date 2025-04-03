@@ -19,27 +19,26 @@ chillphoto build  # generate the gallery
 
 ```sh
 /gallery
-  chillphoto.toml  # top-level config
-  favicon.png      # favicon
-  head.html        # HTML to include in <head>
-  About.txt        # plain-text file
-  Copyright.md     # Markdown page
-  Equipment.html   # HTML page
-  Category 1.toml  # category config
-  /Category 1      # category
-    Photo1.jpg     # photo (w/ EXIF)
-    Photo1.toml    # photo config
-    Photo1.txt     # photo caption
-    Photo2.png     # photo (w/ EXIF)
-    Photo2.md      # Markdown caption
-  /Category 2      # category
-    Photo3.JPG     # photo (w/ EXIF)
-    Photo3.html    # HTML caption
+  chillphoto.toml           # top-level config
+  favicon.png               # favicon
+  head.html                 # HTML to include in <head>
+  About.txt                 # plain-text file
+  Copyright.md              # Markdown page
+  Equipment.html            # HTML page
+  Category 1.toml           # category config
+  Category 2.{txt,md,html}  # category caption
+  /Category 1               # category
+    Photo1.{jpg,png}        # photo (w/ EXIF)
+    Photo1.toml             # photo config
+    Photo1.{txt,md,html}    # photo caption
+  /Category 2               # category
+    Photo3.JPG              # photo (w/ EXIF)
 ```
 
 ### Category config
 
 ```toml
+description = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0
@@ -49,6 +48,7 @@ thumbnail = "Photo1"
 ### Photo config
 
 ```toml
+alt_text = "..."
 # optional override
 author = "Full Name"
 # optional override
@@ -83,7 +83,6 @@ thumbnail_crop_center = {
 - [ ] Progress bars
 - [ ] Pages within categories
 - [ ] Archive page organized by date
-- [ ] Category descriptions and captions
 - [ ] Optional comment support (via a 3rd party comment form)
 - [ ] AI summarization of images
 - [ ] Show subset of EXIF metadata

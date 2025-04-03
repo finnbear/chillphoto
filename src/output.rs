@@ -182,9 +182,15 @@ impl Gallery {
                             render_html(AppProps {
                                 gallery: self,
                                 title: category.name.clone().into(),
-                                description: category.description.clone().map(|d| d.into()),
+                                description: category.config.description.clone().map(|d| d.into()),
                                 head: Default::default(),
-                                body: render_items(self, &category_path, &category.children),
+                                body: html!{<>
+                                    {render_items(self, &category_path, &category.children)}
+                                    if let Some(text) = &category.text {
+                                        <br/>
+                                        {rich_text_html(text)}
+                                    }
+                                </>},
                                 pages: page_items,
                                 path: category_path.clone(),
                                 relative: None,
@@ -370,7 +376,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                         {format!("{}", creation_date.format("%-d %b, %C%y"))}
                                     </div>
                                 }
-                                if let Some(description) = category.description.clone() {
+                                if let Some(description) = category.config.description.clone() {
                                     <div class="category_item_description">
                                         {description}
                                     </div>
@@ -597,8 +603,9 @@ pub fn app(props: AppProps<'_>) -> Html {
         }
 
         .category_item_description {
-            color: black;
-            font-size: 0.5rem;
+            color: #373737;
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
         }
 
         .preview {

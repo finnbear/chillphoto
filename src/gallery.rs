@@ -87,7 +87,7 @@ impl Gallery {
                 current_items.push(Item::Category(Category {
                     name: category_name.to_string(),
                     creation_date: None,
-                    description: None,
+                    text: None,
                     children: Vec::new(),
                     config: CategoryConfig::default(),
                 }));
@@ -175,7 +175,7 @@ impl Item {
 pub struct Category {
     pub name: String,
     pub creation_date: Option<NaiveDate>,
-    pub description: Option<String>,
+    pub text: Option<RichText>,
     pub children: Vec<Item>,
     pub config: CategoryConfig,
 }
