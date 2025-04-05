@@ -54,7 +54,7 @@ fn default_photo_resolution() -> u32 {
 }
 
 fn default_preview_format() -> String {
-    "webp".to_owned()
+    "jpg".to_owned()
 }
 
 fn default_preview_resolution() -> u32 {
@@ -62,7 +62,7 @@ fn default_preview_resolution() -> u32 {
 }
 
 fn default_thumbnail_format() -> String {
-    "webp".to_owned()
+    "jpg".to_owned()
 }
 
 fn default_thumbnail_resolution() -> u32 {

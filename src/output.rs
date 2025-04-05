@@ -735,7 +735,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                             {html!{<>
                                 {"Published by "}
                                 if let Some(href) = props.gallery.config.author_url.clone() {
-                                    <a {href}>{author}</a>
+                                    <a {href} target="_blank">{author}</a>
                                 } else {
                                     {author}
                                 }

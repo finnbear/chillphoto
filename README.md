@@ -70,7 +70,7 @@ thumbnail_crop_center = {
 
 ## Features
 - [x] Instantly preview gallery via embedded server
-- [x] Generate a completely static gallery website site
+- [x] Generate a completely static gallery website
 - [x] Full, preview, and thumbnail sizes
 - [x] Arbitrarily-nested photo categories
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
@@ -80,7 +80,6 @@ thumbnail_crop_center = {
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
 - [ ] Support for themes
-- [ ] Progress bars
 - [ ] Pages within categories
 - [ ] Archive page organized by date
 - [ ] Optional comment support (via a 3rd party comment form)

@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use config::{CategoryConfig, GalleryConfig, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
+use indicatif::{ProgressBar, ProgressStyle};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
@@ -328,6 +329,15 @@ fn main() {
     if matches!(args.command, Command::Serve) {
         serve(start, &output);
     } else {
+        let progress = ProgressBar::new(output.len() as u64)
+            .with_message("Saving website...")
+            .with_style(
+                ProgressStyle::default_bar()
+                    .template("{msg} {wide_bar} {pos}/{len} {eta}")
+                    .unwrap(),
+            )
+            .with_elapsed(start.elapsed());
+
         if fs::exists(&gallery.config.output).unwrap() {
             remove_dir_contents(&gallery.config.output).expect("failed to clear output directory");
         }
@@ -339,7 +349,10 @@ fn main() {
                 std::fs::create_dir_all(dir).unwrap();
             }
             std::fs::write(path, contents).unwrap();
+            progress.inc(1);
         });
+
+        progress.finish_and_clear();
 
         println!(
             "({:.1}s) Saved website to {}",
