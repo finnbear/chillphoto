@@ -20,6 +20,7 @@ use wax::Glob;
 mod category_path;
 mod config;
 mod exif;
+mod format;
 mod gallery;
 mod output;
 mod photo;

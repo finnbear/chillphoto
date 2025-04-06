@@ -797,11 +797,15 @@ pub fn rich_text_html(text: &RichText) -> Html {
                 </>}
             })
             .collect(),
-        RichTextFormat::Markdown => Html::from_html_unchecked(
-            markdown::to_html_with_options(&text.content, &markdown::Options::gfm())
-                .unwrap()
-                .into(),
-        ),
+        RichTextFormat::Markdown => {
+            let mut options = markdown::Options::gfm();
+            options.compile.allow_dangerous_html = true;
+            Html::from_html_unchecked(
+                markdown::to_html_with_options(&text.content, &options)
+                    .unwrap()
+                    .into(),
+            )
+        }
         RichTextFormat::Html => Html::from_html_unchecked(text.content.clone().into()),
     }
 }

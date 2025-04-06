@@ -1,8 +1,10 @@
-use crate::{category_path::CategoryPath, util::add_trailing_slash_if_nonempty};
+use crate::{
+    category_path::CategoryPath, format::OutputFormat, util::add_trailing_slash_if_nonempty,
+};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GalleryConfig {
     #[serde(default = "default_input")]
     pub input: String,
@@ -20,15 +22,15 @@ pub struct GalleryConfig {
     #[serde(default = "default_categories")]
     pub categories: Vec<String>,
     #[serde(default = "default_photo_format")]
-    pub photo_format: String,
+    pub photo_format: OutputFormat,
     #[serde(default = "default_photo_resolution")]
     pub photo_resolution: u32,
     #[serde(default = "default_preview_format")]
-    pub preview_format: String,
+    pub preview_format: OutputFormat,
     #[serde(default = "default_preview_resolution")]
     pub preview_resolution: u32,
     #[serde(default = "default_thumbnail_format")]
-    pub thumbnail_format: String,
+    pub thumbnail_format: OutputFormat,
     #[serde(default = "default_thumbnail_resolution")]
     pub thumbnail_resolution: u32,
 }
@@ -45,24 +47,24 @@ fn default_categories() -> Vec<String> {
     vec!["photo".to_owned()]
 }
 
-fn default_photo_format() -> String {
-    "jpg".to_owned()
+fn default_photo_format() -> OutputFormat {
+    OutputFormat::Jpg
 }
 
 fn default_photo_resolution() -> u32 {
     3840
 }
 
-fn default_preview_format() -> String {
-    "jpg".to_owned()
+fn default_preview_format() -> OutputFormat {
+    OutputFormat::Jpg
 }
 
 fn default_preview_resolution() -> u32 {
     1920
 }
 
-fn default_thumbnail_format() -> String {
-    "jpg".to_owned()
+fn default_thumbnail_format() -> OutputFormat {
+    OutputFormat::Jpg
 }
 
 fn default_thumbnail_resolution() -> u32 {
