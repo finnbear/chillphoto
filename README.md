@@ -22,9 +22,7 @@ chillphoto build  # generate the gallery
   chillphoto.toml           # top-level config
   favicon.png               # favicon
   head.html                 # HTML to include in <head>
-  About.txt                 # plain-text file
-  Copyright.md              # Markdown page
-  Equipment.html            # HTML page
+  About.{txt,md,html}       # page, linked on sidebar
   Category 1.toml           # category config
   Category 2.{txt,md,html}  # category caption
   /Category 1               # category
