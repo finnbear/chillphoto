@@ -187,7 +187,6 @@ impl Gallery {
                                 body: html!{<>
                                     {render_items(self, &category_path, &category.children)}
                                     if let Some(text) = &category.text {
-                                        <br/>
                                         {rich_text_html(text)}
                                     }
                                 </>},
@@ -320,74 +319,76 @@ pub struct RelativeNavigation {
 
 fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item]) -> Html {
     html! {
-        {items.iter().filter_map(|child| {
-            match child {
-                Item::Photo(photo) => {
-                    Some(html!{
-                        <a
-                            class="thumbnail_container"
-                            href={gallery.config.photo_html::<true>(&category_path, &photo.name)}
-                        >
-                            <img
-                                title={photo.name.clone()}
-                                alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
-                                src={gallery.config.thumbnail::<true>(&category_path, &photo.name)}
-                                style={format!(
-                                    "width: {}px; height: {}px;",
-                                    gallery.config.thumbnail_resolution,
-                                    gallery.config.thumbnail_resolution
-                                )}
-                                class="thumbnail"
-                            />
-                        </a>
-                    })
-                }
-                Item::Category(category) => {
-                    let mut representative = Option::<(CategoryPath, &Photo)>::None;
-                    category.visit_items(&category_path, |path, item| {
-                        if let Item::Photo(photo) = item {
-                            if representative.is_none() || category.config.thumbnail.as_ref() == Some(&photo.name) {
-                                representative = Some((path.clone(), photo));
+        <div id="page_main_body_items">
+            {items.iter().filter_map(|child| {
+                match child {
+                    Item::Photo(photo) => {
+                        Some(html!{
+                            <a
+                                class="thumbnail_container"
+                                href={gallery.config.photo_html::<true>(&category_path, &photo.name)}
+                            >
+                                <img
+                                    title={photo.name.clone()}
+                                    alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
+                                    src={gallery.config.thumbnail::<true>(&category_path, &photo.name)}
+                                    style={format!(
+                                        "width: {}px; height: {}px;",
+                                        gallery.config.thumbnail_resolution,
+                                        gallery.config.thumbnail_resolution
+                                    )}
+                                    class="thumbnail"
+                                />
+                            </a>
+                        })
+                    }
+                    Item::Category(category) => {
+                        let mut representative = Option::<(CategoryPath, &Photo)>::None;
+                        category.visit_items(&category_path, |path, item| {
+                            if let Item::Photo(photo) = item {
+                                if representative.is_none() || category.config.thumbnail.as_ref() == Some(&photo.name) {
+                                    representative = Some((path.clone(), photo));
+                                }
                             }
-                        }
-                    });
-                    let (photo_path, photo) = representative?;
-                    Some(html!{
-                        <a
-                            class="thumbnail_container category_item"
-                            href={gallery.config.category_html::<true>(&category_path, &category.slug())}
-                        >
-                            <img
-                                class="thumbnail"
-                                style={format!(
-                                    "width: {}px; height: {}px;",
-                                    gallery.config.thumbnail_resolution,
-                                    gallery.config.thumbnail_resolution
-                                )}
-                                alt={photo.name.clone()}
-                                src={gallery.config.thumbnail::<true>(&photo_path, &photo.name)}
-                            />
-                            <div class="category_item_info">
-                                <h2 class="category_item_name">
-                                    {category.name.clone()}
-                                </h2>
-                                if let Some(creation_date) = category.creation_date.clone() {
-                                    <div class="category_item_creation_date">
-                                        {format!("{}", creation_date.format("%-d %b, %C%y"))}
-                                    </div>
-                                }
-                                if let Some(description) = category.config.description.clone() {
-                                    <div class="category_item_description">
-                                        {description}
-                                    </div>
-                                }
-                            </div>
-                        </a>
-                    })
+                        });
+                        let (photo_path, photo) = representative?;
+                        Some(html!{
+                            <a
+                                class="thumbnail_container category_item"
+                                href={gallery.config.category_html::<true>(&category_path, &category.slug())}
+                            >
+                                <img
+                                    class="thumbnail"
+                                    style={format!(
+                                        "width: {}px; height: {}px;",
+                                        gallery.config.thumbnail_resolution,
+                                        gallery.config.thumbnail_resolution
+                                    )}
+                                    alt={photo.name.clone()}
+                                    src={gallery.config.thumbnail::<true>(&photo_path, &photo.name)}
+                                />
+                                <div class="category_item_info">
+                                    <h2 class="category_item_name">
+                                        {category.name.clone()}
+                                    </h2>
+                                    if let Some(creation_date) = category.creation_date.clone() {
+                                        <div class="category_item_creation_date">
+                                            {format!("{}", creation_date.format("%-d %b, %C%y"))}
+                                        </div>
+                                    }
+                                    if let Some(description) = category.config.description.clone() {
+                                        <div class="category_item_description">
+                                            {description}
+                                        </div>
+                                    }
+                                </div>
+                            </a>
+                        })
+                    }
+                    Item::Page(_) => None
                 }
-                Item::Page(_) => None
-            }
-        }).collect::<Html>()}
+            }).collect::<Html>()}
+        </div>
     }
 }
 
@@ -526,8 +527,11 @@ pub fn app(props: AppProps<'_>) -> Html {
         }
 
         #page_main_body {
-            margin: 2rem;
             flex-grow: 1;
+            margin: 2rem;
+        }
+
+        #page_main_body_items {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
