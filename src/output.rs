@@ -847,7 +847,7 @@ struct PhotoStructuredData {
     thumbnail: Option<Box<PhotoStructuredData>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(rename = "representativeOfPage", skip_serializing_if = "is_false")]
     representative_of_page: bool,
     width: u32,
     height: u32,
