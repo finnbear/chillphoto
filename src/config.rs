@@ -16,6 +16,7 @@ pub struct GalleryConfig {
     pub root_url: Option<String>,
     pub author_url: Option<String>,
     pub license_url: Option<String>,
+    pub acquire_license_url: Option<String>,
     pub description: Option<String>,
     #[serde(default)]
     pub disallow_ai_training: bool,

@@ -74,7 +74,7 @@ impl Gallery {
                         config.photo_html::<false>(&path, &photo.name),
                         LazyLock::new(Box::new(move || {
                             /// https://schema.org/Person
-                            #[derive(Serialize)]
+                            #[derive(Clone, Serialize)]
                             struct PersonStructuredData {
                                 #[serde(rename = "@type")]
                                 _type: &'static str,
@@ -82,7 +82,7 @@ impl Gallery {
                             }
 
                             /// https://schema.org/ImageObject
-                            #[derive(Serialize)]
+                            #[derive(Clone, Serialize)]
                             struct PhotoStructuredData {
                                 #[serde(rename = "@context")]
                                 context: &'static str,
@@ -98,9 +98,15 @@ impl Gallery {
                                 #[serde(skip_serializing_if = "Option::is_none")]
                                 creator: Option<PersonStructuredData>,
                                 #[serde(rename = "copyrightHolder", skip_serializing_if = "Option::is_none")]
-                                copyright_holder: Option<String>,
+                                copyright_holder: Option<PersonStructuredData>,
                                 #[serde(rename = "copyrightYear", skip_serializing_if = "Option::is_none")]
                                 copyright_year: Option<i32>,
+                                #[serde(rename = "creditText", skip_serializing_if = "Option::is_none")]
+                                credit_text: Option<String>,
+                                #[serde(rename = "copyrightNotice", skip_serializing_if = "Option::is_none")]
+                                copyright_notice: Option<String>,
+                                #[serde(rename = "acquireLicensePage", skip_serializing_if = "Option::is_none")]
+                                acquire_license_page: Option<String>,
                                 #[serde(skip_serializing_if = "Option::is_none")]
                                 license: Option<String>,
                             }
@@ -108,6 +114,11 @@ impl Gallery {
                             let author = photo.config.author.as_ref().or(self.config.author.as_ref());
                             let license = photo.config.license_url.as_ref().or(self.config.license_url.as_ref());
 
+                            let author_person = author.cloned().map(|name| PersonStructuredData{
+                                _type: "Person",
+                                name,
+                            });
+                            let copyright_year = photo.date().map(|d| d.year());
                             let photo_structured_data = [self.config.thumbnail::<true>(&path, &photo.name), self.config.preview::<true>(&path, &photo.name), self.config.photo::<true>(&path, &photo.name)].into_iter().map(|content_url| {
                                 write_structured_data(PhotoStructuredData{
                                     context: "https://schema.org",
@@ -116,13 +127,18 @@ impl Gallery {
                                     name: photo.name.clone(),
                                     description: photo.config.alt_text.clone(),
                                     date_created: photo.date().map(|d| d.to_string()),
-                                    creator: author.cloned().map(|name| PersonStructuredData{
-                                        _type: "Person",
-                                        name,
-                                    }),
-                                    copyright_holder: author.cloned(),
-                                    copyright_year: photo.date().map(|d| d.year()),
+                                    creator: author_person.clone(),
+                                    copyright_holder: author_person.clone(),
+                                    copyright_year,
+                                    copyright_notice: match (author.as_ref(), copyright_year) {
+                                        (Some(a), Some(y)) => Some(format!("© {y} {a}")),
+                                        (Some(a), None) => Some(format!("© {a}")),
+                                        (None, Some(y)) => Some(format!("© {y}")),
+                                        (None, None) => None,
+                                    },
+                                    credit_text: author.cloned(),
                                     license: license.cloned(),
+                                    acquire_license_page: self.config.acquire_license_url.clone(),
                                 })
                             }).collect::<Html>();
 
