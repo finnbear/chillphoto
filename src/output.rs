@@ -622,92 +622,98 @@ pub fn app(props: AppProps<'_>) -> Html {
             </head>
             <body>
                 <div id="page">
-                    <header id="header" data-nosnippet={"nosnippet"}>
-                        <h1 id="title">{props.gallery.config.title.clone()}</h1>
-                        if let Some(relative) = &props.relative {
-                            <div id="relative_navigation">
-                                <a
-                                    href={relative.previous.clone()}
-                                    class={classes!(
-                                        "relative_navigation_previous",
-                                        relative.previous.is_none().then_some("relative_navigation_unavailable"),
-                                    )}
-                                >{"Previous"}</a>
-                                <a
-                                    href={relative.next.clone()}
-                                    class={classes!(
-                                        "relative_navigation_previous",
-                                        relative.next.is_none().then_some("relative_navigation_unavailable"),
-                                    )}
-                                >{"Next"}</a>
-                            </div>
-                        }
-                    </header>
-                    <nav id="breadcrumbs" data-nosnippet={"nosnippet"}>
-                        {join(&props.path.iter_paths().map(|path| if path != props.path {
-                            html!{
-                                <a
-                                    class={"breadcrumb"}
-                                    href={if path.is_root() {
-                                        props.gallery.config.index_html::<true>()
-                                    } else {
-                                        props.gallery.config.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
-                                    }}
-                                >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
+                    <section id="header_nav" data-nosnippet={"nosnippet"}>
+                        <header id="header">
+                            <h1 id="title">{props.gallery.config.title.clone()}</h1>
+                            if let Some(relative) = &props.relative {
+                                <div id="relative_navigation">
+                                    <a
+                                        href={relative.previous.clone()}
+                                        class={classes!(
+                                            "relative_navigation_previous",
+                                            relative.previous.is_none().then_some("relative_navigation_unavailable"),
+                                        )}
+                                    >{"Previous"}</a>
+                                    <a
+                                        href={relative.next.clone()}
+                                        class={classes!(
+                                            "relative_navigation_previous",
+                                            relative.next.is_none().then_some("relative_navigation_unavailable"),
+                                        )}
+                                    >{"Next"}</a>
+                                </div>
                             }
-                        } else {
-                            html!{
-                                <span
-                                    class={"breadcrumb breadcrumb_final"}
-                                >{props.gallery.category(&path).map(|c| c.name.as_str()).or(path.last_segment()).unwrap_or("Home").to_owned()}</span>
+                        </header>
+                        <nav id="breadcrumbs" data-nosnippet={"nosnippet"}>
+                            {join(&props.path.iter_paths().map(|path| if path != props.path {
+                                html!{
+                                    <a
+                                        class={"breadcrumb"}
+                                        href={if path.is_root() {
+                                            props.gallery.config.index_html::<true>()
+                                        } else {
+                                            props.gallery.config.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
+                                        }}
+                                    >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
+                                }
+                            } else {
+                                html!{
+                                    <span
+                                        class={"breadcrumb breadcrumb_final"}
+                                    >{props.gallery.category(&path).map(|c| c.name.as_str()).or(path.last_segment()).unwrap_or("Home").to_owned()}</span>
+                                }
+                            }).collect::<Vec<_>>(), &html!{{" » "}})}
+                            if let Some(relative) = &props.relative {
+                                {format!(" ({}/{})", relative.index + 1, relative.count)}
                             }
-                        }).collect::<Vec<_>>(), &html!{{" » "}})}
-                        if let Some(relative) = &props.relative {
-                            {format!(" ({}/{})", relative.index + 1, relative.count)}
-                        }
-                    </nav>
-                    <div id="main_and_sidebar">
+                        </nav>
+                    </section>
+                    <section id="main_and_sidebar">
                         <main id="page_main_body">
                             {props.body.clone()}
                         </main>
-                        <aside id="sidebar" data-nosnippet={"nosnippet"}>
-                            if !props.pages.is_empty() {
-                                <div class="sidebar_panel">
-                                    <h2 class="sidebar_panel_heading">{"Pages"}</h2>
-                                    <ul class="sidebar_panel_list">
-                                        {props.pages.iter().map(|(href, page)| html!{
-                                            <li class="sidebar_panel_list_item">
-                                                <a
-                                                    class="sidebar_panel_list_link"
-                                                    href={href.clone()}
-                                                >{page.name.clone()}</a>
-                                            </li>
-                                        }).collect::<Html>()}
-                                    </ul>
-                                </div>
-                            }
-                        </aside>
-                    </div>
-                    <footer id="footer" data-nosnippet={"nosnippet"}>
-                        {join(&props.gallery.config.author.as_ref().map(|author| {
-                            {html!{<>
-                                {"Published by "}
-                                if let Some(href) = props.gallery.config.author_url.clone() {
-                                    <a {href} target="_blank">{author}</a>
-                                } else {
-                                    {author}
+                        <section id="sidebar_section" data-nosnippet={"nosnippet"}>
+                            <aside id="sidebar">
+                                if !props.pages.is_empty() {
+                                    <div class="sidebar_panel">
+                                        <h2 class="sidebar_panel_heading">{"Pages"}</h2>
+                                        <ul class="sidebar_panel_list">
+                                            {props.pages.iter().map(|(href, page)| html!{
+                                                <li class="sidebar_panel_list_item">
+                                                    <a
+                                                        class="sidebar_panel_list_link"
+                                                        href={href.clone()}
+                                                    >{page.name.clone()}</a>
+                                                </li>
+                                            }).collect::<Html>()}
+                                        </ul>
+                                    </div>
                                 }
-                            </>}}
-                        }).into_iter()
-                            .chain(std::iter::once(html!{<>
-                                {"Powered by "}
-                                <a
-                                    href="https://github.com/finnbear/chillphoto"
-                                    target="_blank"
-                                >{"chillphoto"}</a>
-                            </>}))
-                        .collect::<Vec<_>>(), &html!{{" | "}})}
-                    </footer>
+                            </aside>
+                        </section>
+                    </section>
+                    <section id="footer_section" data-nosnippet={"nosnippet"}>
+                        <footer id="footer">
+                            {join(&props.gallery.config.author.as_ref().map(|author| {
+                                {html!{<>
+                                    {"Published by "}
+                                    if let Some(href) = props.gallery.config.author_url.clone() {
+                                        <a {href} target="_blank">{author}</a>
+                                    } else {
+                                        {author}
+                                    }
+                                </>}}
+                            }).into_iter()
+                                .chain(std::iter::once(html!{<>
+                                    {"Powered by "}
+                                    <a
+                                        href="https://github.com/finnbear/chillphoto"
+                                        target="_blank"
+                                    >{"chillphoto"}</a>
+                                </>}))
+                            .collect::<Vec<_>>(), &html!{{" | "}})}
+                        </footer>
+                    </section>
                 </div>
             </body>
         </html>
