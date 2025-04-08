@@ -602,9 +602,11 @@ pub fn app(props: AppProps<'_>) -> Html {
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 if let Some(relative) = &props.relative {
                     if let Some(previous) = &relative.previous {
+                        <link rel="prev" href={previous.clone()}/>
                         <link rel="prerender" href={previous.clone()}/>
                     }
                     if let Some(next) = &relative.next {
+                        <link rel="next" href={next.clone()}/>
                         <link rel="prerender" href={next.clone()}/>
                     }
                 }
@@ -620,7 +622,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             </head>
             <body>
                 <div id="page">
-                    <header id="header">
+                    <header id="header" data-nosnippet={"nosnippet"}>
                         <h1 id="title">{props.gallery.config.title.clone()}</h1>
                         if let Some(relative) = &props.relative {
                             <div id="relative_navigation">
@@ -641,7 +643,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                             </div>
                         }
                     </header>
-                    <nav id="breadcrumbs">
+                    <nav id="breadcrumbs" data-nosnippet={"nosnippet"}>
                         {join(&props.path.iter_paths().map(|path| if path != props.path {
                             html!{
                                 <a
@@ -668,7 +670,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                         <main id="page_main_body">
                             {props.body.clone()}
                         </main>
-                        <aside id="sidebar">
+                        <aside id="sidebar" data-nosnippet={"nosnippet"}>
                             if !props.pages.is_empty() {
                                 <div class="sidebar_panel">
                                     <h2 class="sidebar_panel_heading">{"Pages"}</h2>
@@ -686,7 +688,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                             }
                         </aside>
                     </div>
-                    <footer id="footer">
+                    <footer id="footer" data-nosnippet={"nosnippet"}>
                         {join(&props.gallery.config.author.as_ref().map(|author| {
                             {html!{<>
                                 {"Published by "}
