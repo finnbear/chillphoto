@@ -495,6 +495,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             min-width: 18rem;
             width: 18rem;
             box-shadow: -0.25rem 0px 0.5rem 0 rgba(0, 0, 0, 0.1);
+            height: 100%;
         }
 
         .sidebar_panel {
