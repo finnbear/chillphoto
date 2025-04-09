@@ -1,5 +1,5 @@
 use category_path::CategoryPath;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use clap::{Parser, Subcommand};
 use config::{CategoryConfig, GalleryConfig, PhotoConfig};
 use exif::ExifData;
@@ -253,7 +253,8 @@ fn main() {
 
             category.visit_items(&CategoryPath::ROOT, |_, child| {
                 if let Item::Photo(photo) = child {
-                    if let Some(date) = photo.date() {
+                    if let Some(date_time) = photo.date_time() {
+                        let date = date_time.date();
                         if first_date.map(|fd| date < fd).unwrap_or(true) {
                             first_date = Some(date);
                         }
@@ -283,10 +284,12 @@ fn main() {
     enum Order {
         Category {
             order: Reverse<i64>,
+            name: String,
         },
         Photo {
             order: Reverse<i64>,
-            date: Reverse<Option<NaiveDate>>,
+            date: Reverse<Option<NaiveDateTime>>,
+            name: String,
         },
         Irrelevant,
     }
@@ -296,10 +299,12 @@ fn main() {
             match item {
                 Item::Category(category) => Order::Category {
                     order: Reverse(category.config.order),
+                    name: category.name.clone(),
                 },
                 Item::Photo(photo) => Order::Photo {
                     order: Reverse(photo.config.order),
-                    date: Reverse(photo.exif.date()),
+                    date: Reverse(photo.date_time()),
+                    name: photo.name.clone(),
                 },
                 _ => Order::Irrelevant,
             }

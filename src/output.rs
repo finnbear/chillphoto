@@ -897,7 +897,7 @@ fn photo_structured_data(
         _type: "Person",
         name,
     });
-    let copyright_year = photo.date().map(|d| d.year());
+    let copyright_year = photo.date_time().map(|d| d.year());
     let (width, height) = if thumbnail_url.is_some() {
         photo.image_dimensions(&gallery.config)
     } else {
@@ -911,7 +911,7 @@ fn photo_structured_data(
         content_url,
         name: photo.name.clone(),
         description: photo.config.alt_text.clone(),
-        date_created: photo.date().map(|d| d.to_string()),
+        date_created: photo.date_time().map(|d| d.date().to_string()),
         creator: author_person.clone(),
         copyright_holder: author_person.clone(),
         copyright_year,

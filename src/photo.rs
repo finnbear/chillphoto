@@ -3,7 +3,7 @@ use crate::{
     exif::ExifData,
     gallery::RichText,
 };
-use chrono::{DateTime, NaiveDate};
+use chrono::{DateTime, NaiveDateTime};
 use image::{
     imageops::{self, FilterType},
     DynamicImage, ImageDecoder, ImageReader, RgbImage,
@@ -23,15 +23,15 @@ pub struct Photo {
 }
 
 impl Photo {
-    pub fn date(&self) -> Option<NaiveDate> {
-        self.exif.date().or_else(|| {
+    pub fn date_time(&self) -> Option<NaiveDateTime> {
+        self.exif.date_time().or_else(|| {
             self.file_date.and_then(|fd| {
                 DateTime::from_timestamp_millis(
                     fd.duration_since(SystemTime::UNIX_EPOCH)
                         .unwrap()
                         .as_millis() as i64,
                 )
-                .map(|dt| dt.naive_local().date())
+                .map(|dt| dt.naive_local())
             })
         })
     }

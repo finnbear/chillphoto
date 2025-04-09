@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::NaiveDateTime;
 use exif::{Exif, In, Tag};
 use std::io::Cursor;
 
@@ -37,11 +37,10 @@ impl ExifData {
             .and_then(|(w, h)| parse_pixels(w).zip(parse_pixels(h)))
     }
 
-    pub fn date(&self) -> Option<NaiveDate> {
+    pub fn date_time(&self) -> Option<NaiveDateTime> {
         self.original_time_taken
             .as_ref()
-            .and_then(|s| NaiveDate::parse_and_remainder(s, "%Y-%m-%d").ok())
-            .map(|(d, _)| d)
+            .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
     }
 
     pub fn oriented(&self) -> bool {
@@ -55,6 +54,7 @@ impl ExifData {
         let meta = exifreader.read_from_container(&mut Cursor::new(file)).ok();
 
         // Debug.
+        // meta.as_ref().is_some_and(|m| m.get_field(Tag::Make, In::PRIMARY).unwrap().display_value().to_string().contains("Canon"))
         if false {
             if let Some(meta) = &meta {
                 for f in meta.fields() {
