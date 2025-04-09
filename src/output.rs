@@ -76,6 +76,7 @@ impl Gallery {
                             let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.name), self.config.photo::<true>(&path, &photo.name), Some(self.config.thumbnail::<true>(&path, &photo.name)), true));
 
                             render_html(AppProps {
+                                canonical: config.photo_html::<true>(&path, &photo.name),
                                 gallery: self,
                                 title: photo.name.clone().into(),
                                 description: photo.config.alt_text.clone().map(|s| s.into()),
@@ -129,6 +130,7 @@ impl Gallery {
                         config.category_html::<false>(&path, &category.slug()),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
+                                canonical: config.category_html::<true>(&path, &category.slug()),
                                 gallery: self,
                                 title: category.name.clone().into(),
                                 description: category.config.description.clone().map(|d| d.into()),
@@ -152,6 +154,7 @@ impl Gallery {
                         config.page_html::<false>(&path, &page.name),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
+                                canonical: config.page_html::<true>(&path, &page.name),
                                 gallery: self,
                                 title: page.name.clone().into(),
                                 description: None,
@@ -209,6 +212,7 @@ impl Gallery {
                 });
 
                 render_html(AppProps {
+                    canonical: self.config.index_html::<true>(),
                     gallery: self,
                     title: self.config.title.clone().into(),
                     description: self.config.description.clone().map(|d| d.into()),
@@ -378,6 +382,7 @@ fn render_html(props: AppProps<'_>) -> Vec<u8> {
 
 pub struct AppProps<'a> {
     pub gallery: &'a Gallery,
+    pub canonical: String,
     pub path: CategoryPath,
     pub title: AttrValue,
     pub description: Option<AttrValue>,
@@ -601,6 +606,9 @@ pub fn app(props: AppProps<'_>) -> Html {
                 }
                 <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                if let Some(root) = &props.gallery.config.root_url {
+                    <link rel="canonical" href={format!("{root}{}", props.canonical)}/>
+                }
                 if let Some(relative) = &props.relative {
                     if let Some(previous) = &relative.previous {
                         <link rel="prev" href={previous.clone()}/>
