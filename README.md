@@ -10,9 +10,12 @@ cargo install --git https://github.com/finnbear/chillphoto
 
 ### Sub-commands
 ```sh
-chillphoto init   # initialize top-level config
-chillphoto serve  # preview the gallery
-chillphoto build  # generate the gallery
+chillphoto init     # initialize top-level config
+chillphoto serve    # preview the gallery
+chillphoto build    # generate the gallery
+
+ollama pull llava   # install dependency
+chillphoto image-ai # AI-generate photo descriptions based on thumbnails
 ```
 
 ### Directory Structure
@@ -74,7 +77,7 @@ thumbnail_crop_center = {
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Sitemap
 - [x] Structured data
-- [x] AI photo descriptions (dependency: install ollama + `ollama run llava`)
+- [x] AI photo descriptions
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
