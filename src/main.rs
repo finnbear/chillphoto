@@ -7,13 +7,15 @@ use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use indicatif::{ProgressBar, ProgressStyle};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde::Serialize;
 use serve::serve;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Seek, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
+use summary::ai_summarize;
 use util::remove_dir_contents;
 use wax::Glob;
 
@@ -25,6 +27,7 @@ mod gallery;
 mod output;
 mod photo;
 mod serve;
+mod summary;
 mod util;
 
 #[derive(Parser)]
@@ -42,6 +45,8 @@ enum Command {
     Serve,
     /// Build static gallery website.
     Build,
+    /// Use ollama llava:latest to generate missing alt text.
+    AiAltText,
 }
 
 fn main() {
@@ -87,7 +92,7 @@ fn main() {
     }
 
     let entries = glob
-        .walk(root)
+        .walk(&root)
         .not([config.output.as_str()])
         .unwrap()
         .collect::<Vec<_>>();
@@ -324,6 +329,59 @@ fn main() {
         "({:.1}s) Found {photos} photos ({photo_configs} with config, {photo_texts} with caption) in {categories} categories ({category_configs} with config, {category_texts} with caption), and {pages} pages",
         start.elapsed().as_secs_f32()
     );
+
+    if matches!(args.command, Command::AiAltText) {
+        gallery.visit_items(|path, item| {
+            if let Some(photo) = item.photo() {
+                if photo.config.alt_text.is_some() {
+                    return;
+                }
+
+                let category_name = if path.is_root() {
+                    gallery.config.title.as_str()
+                } else {
+                    gallery.category(path).unwrap().name.as_str()
+                };
+
+                let summary = ai_summarize(category_name, photo.preview(&gallery.config));
+
+                let mut config_path = root.clone();
+                for path in path.iter_paths().skip(1) {
+                    config_path.push(&gallery.category(&path).unwrap().name);
+                }
+                config_path.push(format!("{}.toml", photo.name));
+
+                #[derive(Serialize)]
+                struct Append {
+                    alt_text: String,
+                }
+
+                let mut append = toml::to_string(&Append {
+                    alt_text: summary.trim().to_owned(),
+                })
+                .unwrap();
+
+                let mut file = fs::OpenOptions::new()
+                    .read(true)
+                    .create(true)
+                    .append(true)
+                    .open(&config_path)
+                    .unwrap();
+                if file.metadata().unwrap().len() > 0 {
+                    file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                    let mut existing = String::new();
+                    file.read_to_string(&mut existing).unwrap();
+                    if !existing.ends_with('\n') {
+                        append.insert(0, '\n');
+                    }
+                    file.seek(std::io::SeekFrom::End(0)).unwrap();
+                }
+                write!(file, "{}", append).unwrap();
+                println!("summarized {}", photo.name);
+            }
+        });
+        return;
+    }
 
     let output = gallery.output();
 

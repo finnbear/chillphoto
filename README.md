@@ -74,6 +74,7 @@ thumbnail_crop_center = {
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Sitemap
 - [x] Structured data
+- [ ] AI alt-text generation (dependency: install ollama + `ollama run llava`)
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
@@ -81,7 +82,6 @@ thumbnail_crop_center = {
 - [ ] Pages within categories
 - [ ] Archive page organized by date
 - [ ] Optional comment support (via a 3rd party comment form)
-- [ ] AI summarization of images
 - [ ] Show subset of EXIF metadata
 - [ ] RSS feed
 - [ ] Optional visual editor

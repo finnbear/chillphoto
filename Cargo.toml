@@ -8,6 +8,7 @@ repository = "https://github.com/finnbear/chillphoto/"
 description = "Static photo gallery website generator"
 
 [dependencies]
+base64 = "0.22.1"
 chrono = "0.4.40"
 clap = { version = "4.5.34", features = ["derive"] }
 futures = "0.3.31"
@@ -18,9 +19,11 @@ indicatif = "0.17.11"
 kamadak-exif = "0.6.1"
 markdown = "1.0.0-alpha.23"
 markup_fmt = "0.19.0"
+ollama-rs = "0.3.0"
 rayon = "1.10.0"
 serde = "1.0.219"
 serde_json = "1.0.140"
+tokio = { version = "1.44.2", features = ["rt"] }
 toml = "0.8.20"
 wax = "0.6.0"
 yew = { version = "0.21.0", features = ["ssr"] }
