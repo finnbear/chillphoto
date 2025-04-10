@@ -79,7 +79,7 @@ impl Gallery {
                                 canonical: config.photo_html::<true>(&path, &photo.name),
                                 gallery: self,
                                 title: photo.name.clone().into(),
-                                description: photo.config.alt_text.clone().map(|s| s.into()),
+                                description: photo.config.description.clone().map(|s| s.into()),
                                 head: photo_structured_data,
                                 body: html! {<>
                                     <a
@@ -90,7 +90,7 @@ impl Gallery {
                                             class="preview"
                                             width={photo.preview_dimensions(config).0.to_string()}
                                             height={photo.preview_dimensions(config).1.to_string()}
-                                            alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
+                                            alt={photo.config.description.as_ref().unwrap_or(&photo.name).clone()}
                                             src={config.preview::<true>(&path, &photo.name)}
                                         />
                                     </a>
@@ -283,7 +283,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                             >
                                 <img
                                     title={photo.name.clone()}
-                                    alt={photo.config.alt_text.as_ref().unwrap_or(&photo.name).clone()}
+                                    alt={photo.config.description.as_ref().unwrap_or(&photo.name).clone()}
                                     src={thumbnail_url.clone()}
                                     style={format!(
                                         "width: {}px; height: {}px;",
@@ -910,7 +910,7 @@ fn photo_structured_data(
         _type: "ImageObject",
         content_url,
         name: photo.name.clone(),
-        description: photo.config.alt_text.clone(),
+        description: photo.config.description.clone(),
         date_created: photo.date_time().map(|d| d.date().to_string()),
         creator: author_person.clone(),
         copyright_holder: author_person.clone(),

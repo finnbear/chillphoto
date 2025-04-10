@@ -4,19 +4,19 @@ use clap::{Parser, Subcommand};
 use config::{CategoryConfig, GalleryConfig, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
+use image_ai::{image_ai, ImageAiPrompt};
 use indicatif::{ProgressBar, ProgressStyle};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use serde::Serialize;
 use serve::serve;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
-use summary::ai_summarize;
-use util::remove_dir_contents;
+use toml_edit::DocumentMut;
+use util::{checksum, remove_dir_contents};
 use wax::Glob;
 
 mod category_path;
@@ -24,10 +24,10 @@ mod config;
 mod exif;
 mod format;
 mod gallery;
+mod image_ai;
 mod output;
 mod photo;
 mod serve;
-mod summary;
 mod util;
 
 #[derive(Parser)]
@@ -45,8 +45,8 @@ enum Command {
     Serve,
     /// Build static gallery website.
     Build,
-    /// Use ollama llava:latest to generate missing alt text.
-    AiAltText,
+    /// Use ollama llava:latest to generate missing photo descriptions.
+    ImageAi,
 }
 
 fn main() {
@@ -330,20 +330,40 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    if matches!(args.command, Command::AiAltText) {
+    if matches!(args.command, Command::ImageAi) {
         gallery.visit_items(|path, item| {
             if let Some(photo) = item.photo() {
-                if photo.config.alt_text.is_some() {
-                    return;
-                }
-
                 let category_name = if path.is_root() {
                     gallery.config.title.as_str()
                 } else {
                     gallery.category(path).unwrap().name.as_str()
                 };
 
-                let summary = ai_summarize(category_name, photo.preview(&gallery.config));
+                let prompt = ImageAiPrompt {
+                    prompt: &format!("The category is {category_name}. Describe the photo up to 2 sentences. Do not speculate. Do not mention text or lack of text."),
+                    system_prompt: "You are a photo summarizer tasked with generating descriptions for photos on an gallery website, with an emphasis on accessibility. Visually-impaired people will rely on your descriptions, so make them accurate and interesting.",
+                    photo,
+                    config: &gallery.config,
+                };
+
+                if let Some(description) = photo.config.description.as_ref() {
+                    if photo.config.ai_description_output_checksum != Some(checksum(description.as_bytes())) {
+                        println!("keeping manual description for {}", photo.name);
+                        return;
+                    }
+                }
+
+                let input_checksum = prompt.checksum();
+                if let Some(sum) = &photo.config.ai_description_input_checksum {
+                    if input_checksum == *sum {
+                        println!("keeping existing ai description for {}", photo.name);
+                        return;
+                    } else {
+                        println!("regenerating ai description for {}", photo.name);
+                    }
+                }
+
+                let summary = image_ai(prompt);
 
                 let mut config_path = root.clone();
                 for path in path.iter_paths().skip(1) {
@@ -351,33 +371,25 @@ fn main() {
                 }
                 config_path.push(format!("{}.toml", photo.name));
 
-                #[derive(Serialize)]
-                struct Append {
-                    alt_text: String,
-                }
-
-                let mut append = toml::to_string(&Append {
-                    alt_text: summary.trim().to_owned(),
-                })
-                .unwrap();
-
                 let mut file = fs::OpenOptions::new()
                     .read(true)
                     .create(true)
-                    .append(true)
+                    .write(true)
                     .open(&config_path)
                     .unwrap();
-                if file.metadata().unwrap().len() > 0 {
-                    file.seek(std::io::SeekFrom::Start(0)).unwrap();
-                    let mut existing = String::new();
-                    file.read_to_string(&mut existing).unwrap();
-                    if !existing.ends_with('\n') {
-                        append.insert(0, '\n');
-                    }
-                    file.seek(std::io::SeekFrom::End(0)).unwrap();
-                }
-                write!(file, "{}", append).unwrap();
-                println!("summarized {}", photo.name);
+                file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                let mut existing = String::new();
+                file.read_to_string(&mut existing).unwrap();
+                let mut doc = existing.parse::<DocumentMut>().unwrap();
+                doc["description"] = toml_edit::value(summary.clone());
+                doc["ai_description_input_checksum"] = toml_edit::value(input_checksum);
+                doc["ai_description_output_checksum"] = toml_edit::value(checksum(&summary.as_bytes()));
+                file.seek(SeekFrom::Start(0)).unwrap();
+                file.set_len(0).unwrap();
+                file.write_all(doc.to_string().as_bytes()).unwrap();
+                file.sync_data().unwrap();
+
+                println!("summarized {}: {summary}", photo.name);
             }
         });
         return;

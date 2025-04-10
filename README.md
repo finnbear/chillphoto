@@ -46,7 +46,7 @@ thumbnail = "Photo1"
 ### Photo config
 
 ```toml
-alt_text = "..."
+description = "..."
 # optional override
 author = "Full Name"
 # optional override
@@ -74,7 +74,7 @@ thumbnail_crop_center = {
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Sitemap
 - [x] Structured data
-- [ ] AI alt-text generation (dependency: install ollama + `ollama run llava`)
+- [x] AI photo descriptions (dependency: install ollama + `ollama run llava`)
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling

@@ -182,7 +182,11 @@ pub struct PhotoConfig {
     #[serde(default)]
     pub license_url: Option<String>,
     #[serde(default)]
-    pub alt_text: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub ai_description_input_checksum: Option<String>,
+    #[serde(default)]
+    pub ai_description_output_checksum: Option<String>,
     #[serde(default)]
     pub order: i64,
     #[serde(default = "default_thumbnail_crop_factor")]
