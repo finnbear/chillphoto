@@ -24,9 +24,9 @@ impl<'a> ImageAiPrompt<'a> {
         let mut to_hash = self.photo.input_image_data.clone();
         to_hash.extend_from_slice(self.prompt.as_bytes());
         to_hash.extend_from_slice(self.system_prompt.as_bytes());
-        //let dim = self.photo.preview_dimensions(&self.config);
-        //to_hash.extend_from_slice(&dim.0.to_le_bytes());
-        //to_hash.extend_from_slice(&dim.1.to_le_bytes());
+        to_hash.extend_from_slice(&self.photo.config.thumbnail_crop_factor.to_le_bytes());
+        to_hash.extend_from_slice(&self.photo.config.thumbnail_crop_center.x.to_le_bytes());
+        to_hash.extend_from_slice(&self.photo.config.thumbnail_crop_center.y.to_le_bytes());
         checksum(&to_hash)
     }
 }
