@@ -72,6 +72,15 @@ thumbnail_crop_center = {
 }
 ```
 
+### Page config
+
+```toml
+description = "..."
+# higher -> first
+# -2, -1, 0, 1, 2, etc.
+order = 0
+```
+
 ## Features
 - [x] Instantly preview gallery via embedded server
 - [x] Generate a completely static gallery website
