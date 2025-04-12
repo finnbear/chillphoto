@@ -109,6 +109,14 @@ impl Gallery {
                                 sidebar: html!{
                                     <div class="sidebar_panel">
                                         <h2 class="sidebar_panel_heading">{"Details"}</h2>
+                                        if let Some(location) = photo.config.location.clone() {
+                                            <div
+                                                title={"Location"}
+                                                class={"sidebar_details_panel_text"}
+                                            >
+                                                {location}
+                                            </div>
+                                        }
                                         if let Some(date_time) = photo.date_time() {
                                             <time
                                                 datetime={date_time.date().to_string()}
