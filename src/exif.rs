@@ -17,7 +17,7 @@ pub struct ExifData {
     /// Seconds.
     pub exposure_time: Option<String>,
     pub aperture: Option<String>,
-    // TODO: units
+    // TODO: REI = ISO?
     pub iso_sensitivity: Option<String>,
     pub exposure_compensation: Option<String>,
     pub focal_length: Option<String>,
@@ -84,7 +84,7 @@ impl ExifData {
             lens_model: lookup(&meta, Tag::LensModel),
             original_time_taken: lookup(&meta, Tag::DateTimeOriginal),
             exposure_time: lookup(&meta, Tag::ExposureTime),
-            aperture: lookup(&meta, Tag::ApertureValue),
+            aperture: lookup(&meta, Tag::FNumber),
             iso_sensitivity: lookup(&meta, Tag::PhotographicSensitivity),
             exposure_compensation: lookup(&meta, Tag::ExposureBiasValue),
             focal_length: lookup(&meta, Tag::FocalLength),

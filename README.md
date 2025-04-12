@@ -90,6 +90,7 @@ order = 0
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Sitemap
 - [x] Structured data
+- [x] Essential EXIF metadata
 - [x] AI photo descriptions
 - [ ] Pagination
 - [ ] Hot-reloading
@@ -98,7 +99,6 @@ order = 0
 - [ ] Pages within categories
 - [ ] Archive page organized by date
 - [ ] Optional comment support (via a 3rd party comment form)
-- [ ] Show subset of EXIF metadata
 - [ ] RSS feed
 - [ ] Optional visual editor
 

@@ -2,6 +2,7 @@ use crate::{
     category_path::CategoryPath,
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
+    util::date_format,
 };
 use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
@@ -105,6 +106,52 @@ impl Gallery {
                                     "#.into())}
                                     */
                                 </>},
+                                sidebar: html!{
+                                    <div class="sidebar_panel">
+                                        <h2 class="sidebar_panel_heading">{"Details"}</h2>
+                                        if let Some(date_time) = photo.date_time() {
+                                            <time
+                                                datetime={date_time.date().to_string()}
+                                                title={"Date Taken"}
+                                                class={"sidebar_details_panel_text"}
+                                            >
+                                                {date_format(date_time.date())}
+                                            </time>
+                                        }
+                                        if photo.exif.focal_length.is_some() || photo.exif.aperture.is_some() {
+                                            <div
+                                                title={photo.exif.lens_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
+                                                class={"sidebar_details_panel_text"}
+                                            >
+                                                if let Some(focal_length) = &photo.exif.focal_length {
+                                                    {focal_length.replace(' ', "").to_owned()}
+                                                }
+                                                if photo.exif.focal_length.is_some() && photo.exif.aperture.is_some() {
+                                                    {" "}
+                                                }
+                                                if let Some(aperture) = &photo.exif.aperture {
+                                                    {aperture.clone()}
+                                                }
+                                            </div>
+                                        }
+                                        if photo.exif.exposure_time.is_some() || photo.exif.iso_sensitivity.is_some() {
+                                            <div
+                                                title={photo.exif.camera_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
+                                                class={"sidebar_details_panel_text"}
+                                            >
+                                                if let Some(exposure_time) = &photo.exif.exposure_time {
+                                                    {exposure_time.replace(' ', "").to_owned()}
+                                                }
+                                                if photo.exif.exposure_time.is_some() && photo.exif.iso_sensitivity.is_some() {
+                                                    {" "}
+                                                }
+                                                if let Some(iso_sensitivity) = &photo.exif.iso_sensitivity {
+                                                    {format!("ISO{}", iso_sensitivity)}
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                },
                                 pages: page_items,
                                 path: path.push(photo.name.clone()).clone(),
                                 relative: Some(RelativeNavigation {
@@ -141,6 +188,7 @@ impl Gallery {
                                         {rich_text_html(text)}
                                     }
                                 </>},
+                                sidebar: Html::default(),
                                 pages: page_items,
                                 path: category_path.clone(),
                                 relative: None,
@@ -160,6 +208,7 @@ impl Gallery {
                                 description: page.config.description.clone().map(|s| s.into()),
                                 head: Default::default(),
                                 body: rich_text_html(&page.text),
+                                sidebar: Html::default(),
                                 pages: page_items.clone(),
                                 path: path.push(page.name.clone()).clone(),
                                 relative: None,
@@ -218,6 +267,7 @@ impl Gallery {
                     description: self.config.description.clone().map(|d| d.into()),
                     head: website_structured_data,
                     body: render_items(self, &CategoryPath::ROOT, &self.children),
+                    sidebar: Html::default(),
                     pages: page_items,
                     path: CategoryPath::ROOT,
                     relative: None,
@@ -328,9 +378,12 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                         {category.name.clone()}
                                     </h2>
                                     if let Some(creation_date) = category.creation_date.clone() {
-                                        <div class="category_item_creation_date">
-                                            {format!("{}", creation_date.format("%-d %b, %C%y"))}
-                                        </div>
+                                        <time
+                                            datetime={creation_date.to_string()}
+                                            class="category_item_creation_date"
+                                        >
+                                            {date_format(creation_date)}
+                                        </time>
                                     }
                                     if let Some(description) = category.config.description.clone() {
                                         <div class="category_item_description">
@@ -388,6 +441,7 @@ pub struct AppProps<'a> {
     pub description: Option<AttrValue>,
     pub head: Html,
     pub body: Html,
+    pub sidebar: Html,
     pub pages: Vec<(String, &'a Page)>,
     pub relative: Option<RelativeNavigation>,
 }
@@ -523,7 +577,11 @@ pub fn app(props: AppProps<'_>) -> Html {
             list-style: none;
             margin-top: 0.2rem;
             font-size: 0.9rem;
-        } 
+        }
+
+        .sidebar_details_panel_text {
+            font-size: 0.9rem;
+        }
   
         .sidebar_panel_list_item::before { 
             content: "\00BB"; 
@@ -698,6 +756,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                                         </ul>
                                     </div>
                                 }
+                                {props.sidebar.clone()}
                             </aside>
                         </section>
                     </section>
