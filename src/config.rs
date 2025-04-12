@@ -230,3 +230,16 @@ impl Default for CategoryConfig {
         toml::from_str("").unwrap()
     }
 }
+
+#[derive(Deserialize, Debug)]
+pub struct PageConfig {
+    #[serde(default)]
+    pub order: i64,
+    pub description: Option<String>,
+}
+
+impl Default for PageConfig {
+    fn default() -> Self {
+        toml::from_str("").unwrap()
+    }
+}

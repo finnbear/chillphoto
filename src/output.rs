@@ -157,7 +157,7 @@ impl Gallery {
                                 canonical: config.page_html::<true>(&path, &page.name),
                                 gallery: self,
                                 title: page.name.clone().into(),
-                                description: None,
+                                description: page.config.description.clone().map(|s| s.into()),
                                 head: Default::default(),
                                 body: rich_text_html(&page.text),
                                 pages: page_items.clone(),

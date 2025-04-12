@@ -2,7 +2,7 @@ use std::sync::OnceLock;
 
 use crate::{
     category_path::CategoryPath,
-    config::{CategoryConfig, GalleryConfig},
+    config::{CategoryConfig, GalleryConfig, PageConfig},
     photo::Photo,
 };
 use chrono::NaiveDate;
@@ -201,11 +201,11 @@ pub struct RichText {
     pub format: RichTextFormat,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Page {
     pub name: String,
-    pub description: Option<String>,
     pub text: RichText,
+    pub config: PageConfig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

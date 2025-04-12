@@ -49,7 +49,10 @@ thumbnail = "Photo1"
 ### Photo config
 
 ```toml
+# optional alt text
 description = "..."
+# optional
+location = "..."
 # optional override
 author = "Full Name"
 # optional override

@@ -1,7 +1,7 @@
 use category_path::CategoryPath;
 use chrono::{NaiveDate, NaiveDateTime};
 use clap::{Parser, Subcommand};
-use config::{CategoryConfig, GalleryConfig, PhotoConfig};
+use config::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use image_ai::{image_ai, ImageAiPrompt};
@@ -163,11 +163,11 @@ fn main() {
                 .get_or_create_category(&category_names, &categories);
             to_insert.push(Item::Page(Page {
                 name: name_no_extension,
-                description: None,
                 text: RichText {
                     content: file,
                     format,
                 },
+                config: PageConfig::default(),
             }));
             return;
         }
@@ -210,6 +210,7 @@ fn main() {
     let mut photo_configs = 0usize;
     let mut photo_texts = 0usize;
     let mut pages = 0usize;
+    let mut page_configs = 0usize;
     let mut match_pages = |children: &mut Vec<Item>| {
         let mut matches = Vec::<(String, RichText)>::new();
         for name in children
@@ -280,7 +281,13 @@ fn main() {
             }
             photos += 1;
         }
-        Item::Page(_) => {
+        Item::Page(page) => {
+            let path = path.push(page.name.clone());
+            if let Some(config) = item_configs.remove(&path) {
+                let config = toml::from_str::<PageConfig>(&config).expect(&path.to_string());
+                page.config = config;
+                page_configs += 1;
+            }
             pages += 1;
         }
     });
@@ -296,7 +303,10 @@ fn main() {
             date: Reverse<Option<NaiveDateTime>>,
             name: String,
         },
-        Irrelevant,
+        Page {
+            order: Reverse<i64>,
+            name: String,
+        },
     }
 
     impl Order {
@@ -311,7 +321,10 @@ fn main() {
                     date: Reverse(photo.date_time()),
                     name: photo.name.clone(),
                 },
-                _ => Order::Irrelevant,
+                Item::Page(page) => Order::Page {
+                    order: Reverse(page.config.order),
+                    name: page.name.clone(),
+                },
             }
         }
     }
@@ -326,7 +339,7 @@ fn main() {
 
     //println!("{gallery:?}");
     println!(
-        "({:.1}s) Found {photos} photos ({photo_configs} with config, {photo_texts} with caption) in {categories} categories ({category_configs} with config, {category_texts} with caption), and {pages} pages",
+        "({:.1}s) Found {photos} photos ({photo_configs} with config, {photo_texts} with caption) in {categories} categories ({category_configs} with config, {category_texts} with caption), and {pages} pages ({page_configs} with config)",
         start.elapsed().as_secs_f32()
     );
 
