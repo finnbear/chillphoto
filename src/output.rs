@@ -868,6 +868,18 @@ struct PhotoStructuredData {
     representative_of_page: bool,
     width: u32,
     height: u32,
+    #[serde(rename = "locationCreated")]
+    location_created: Option<PlaceStructuredData>,
+    #[serde(rename = "contentLocation")]
+    content_location: Option<PlaceStructuredData>,
+}
+
+/// https://schema.org/Place
+#[derive(Clone, Serialize)]
+struct PlaceStructuredData {
+    #[serde(rename = "@type")]
+    _type: &'static str,
+    name: String,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -892,6 +904,14 @@ fn photo_structured_data(
         .license_url
         .as_ref()
         .or(gallery.config.license_url.as_ref());
+    let location = photo
+        .config
+        .location
+        .as_ref()
+        .map(|name| PlaceStructuredData {
+            _type: "Place",
+            name: name.clone(),
+        });
 
     let author_person = author.cloned().map(|name| PersonStructuredData {
         _type: "Person",
@@ -942,5 +962,7 @@ fn photo_structured_data(
         representative_of_page,
         width,
         height,
+        location_created: location.clone(),
+        content_location: location,
     }
 }

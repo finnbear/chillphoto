@@ -184,6 +184,8 @@ pub struct PhotoConfig {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
+    pub location: Option<String>,
+    #[serde(default)]
     pub ai_description_input_checksum: Option<String>,
     #[serde(default)]
     pub ai_description_output_checksum: Option<String>,

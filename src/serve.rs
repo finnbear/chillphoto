@@ -53,7 +53,10 @@ pub fn serve(
         let addr = "0.0.0.0:8080";
         let listener = std::net::TcpListener::bind(addr).unwrap();
 
-        println!("({:.1}s) Serving on {addr}", start.elapsed().as_secs_f32());
+        println!(
+            "({:.1}s) Serving on http://{addr}",
+            start.elapsed().as_secs_f32()
+        );
 
         loop {
             let mut stream = if let Ok((stream, _)) = listener.accept() {
