@@ -26,12 +26,13 @@ chillphoto image-ai # AI-generate photo descriptions based on thumbnails
   favicon.png               # favicon
   head.html                 # HTML to include in <head>
   About.{txt,md,html}       # page, linked on sidebar
-  Category 1.toml           # category config
+  About.toml                # page config
   Category 2.{txt,md,html}  # category caption
   /Category 1               # category
     Photo1.{jpg,png}        # photo (w/ EXIF)
     Photo1.toml             # photo config
     Photo1.{txt,md,html}    # photo caption
+  Category 1.toml           # category config
   /Category 2               # category
     Photo3.JPG              # photo (w/ EXIF)
 ```
