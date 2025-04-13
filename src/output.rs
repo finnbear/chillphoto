@@ -357,15 +357,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                         })
                     }
                     Item::Category(category) => {
-                        let mut representative = Option::<(CategoryPath, &Photo)>::None;
-                        category.visit_items(&category_path, |path, item| {
-                            if let Item::Photo(photo) = item {
-                                if representative.is_none() || category.config.thumbnail.as_ref() == Some(&photo.name) {
-                                    representative = Some((path.clone(), photo));
-                                }
-                            }
-                        });
-                        let (photo_path, photo) = representative?;
+                        let (photo_path, photo) = category.thumbnail(category_path)?;
                         Some(html!{
                             <a
                                 class="thumbnail_container category_item"
@@ -649,13 +641,16 @@ pub fn app(props: AppProps<'_>) -> Html {
         .into(),
     );
 
+    let thumbnail = props.gallery.thumbnail();
+
     html! {
         <html lang="en">
             <head>
                 <meta charset="UTF-8"/>
                 <title>{props.title.clone()}</title>
+                <meta property="og:title" content={props.title.clone()} />
                 if let Some(description) = props.description.clone() {
-                    <meta name="description" content={description}/>
+                    <meta name="description" property="og:description" content={description}/>
                 }
                 if !props.gallery.config.categories.is_empty() {
                     <meta name="keywords" content={props.gallery.config.categories.join(",")}/>
@@ -668,12 +663,19 @@ pub fn app(props: AppProps<'_>) -> Html {
                     <link rel="icon" type="image/png" href="/favicon.png"/>
                 }
                 if props.gallery.config.disallow_ai_training {
-                    <meta name="robots" content="DisallowAITraining"/>
+                    <meta name="robots" content="index,follow,DisallowAITraining,noai,noimageai"/>
                 }
                 <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta property="og:type" content="website" />
                 if let Some(root) = &props.gallery.config.root_url {
                     <link rel="canonical" href={format!("{root}{}", props.canonical)}/>
+                    if let Some((path, thumbnail)) = thumbnail {
+                        <meta property="og:image" content={format!(
+                            "{root}{}",
+                            props.gallery.config.thumbnail::<true>(&path, &thumbnail.name)
+                        )}/>
+                    }
                 }
                 if let Some(relative) = &props.relative {
                     if let Some(previous) = &relative.previous {

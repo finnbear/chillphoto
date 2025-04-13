@@ -27,6 +27,19 @@ impl Gallery {
         })
     }
 
+    pub fn thumbnail(&self) -> Option<(CategoryPath, &Photo)> {
+        let mut ret = Option::<(CategoryPath, &Photo)>::None;
+        self.visit_items(|path, item| {
+            if ret.is_some() {
+                return;
+            }
+            if let Some(category) = item.category() {
+                ret = category.thumbnail(path);
+            }
+        });
+        ret
+    }
+
     pub fn children(&self, path: &CategoryPath) -> Option<&Vec<Item>> {
         if path.is_root() {
             return Some(&self.children);
@@ -183,6 +196,18 @@ pub struct Category {
 impl Category {
     pub fn slug(&self) -> String {
         self.name.replace(' ', "-")
+    }
+
+    pub fn thumbnail(&self, path: &CategoryPath) -> Option<(CategoryPath, &Photo)> {
+        let mut ret = Option::<(CategoryPath, &Photo)>::None;
+        self.visit_items(&path, |path, item| {
+            if let Item::Photo(photo) = item {
+                if ret.is_none() || self.config.thumbnail.as_ref() == Some(&photo.name) {
+                    ret = Some((path.clone(), photo));
+                }
+            }
+        });
+        ret
     }
 
     pub fn visit_items<'a>(
