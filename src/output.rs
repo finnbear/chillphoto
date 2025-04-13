@@ -29,6 +29,13 @@ impl Gallery {
             LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
         >::new();
 
+        let root_og_image = self.thumbnail().map(|(path, preview)| {
+            (
+                self.config.preview::<true>(&path, &preview.name),
+                preview.preview_dimensions(&self.config),
+            )
+        });
+
         self.visit_items(|path, item| {
             let path = path.clone();
             match item {
@@ -174,6 +181,7 @@ impl Gallery {
                                         .and_then(|i| photos.get(i))
                                         .map(|p| config.photo_html::<true>(&path, &p.name)),
                                 }),
+                                og_image: Some((self.config.preview::<true>(&path, &photo.name), photo.preview_dimensions(&self.config))),
                             })
                         })),
                     );
@@ -200,12 +208,14 @@ impl Gallery {
                                 pages: page_items,
                                 path: category_path.clone(),
                                 relative: None,
+                                og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, &preview.name), preview.preview_dimensions(&self.config)))
                             })
                         })),
                     );
                 }
                 Item::Page(page) => {
                     let page_items = page_items.clone();
+                    let root_thumbnail = root_og_image.clone();
                     ret.insert(
                         config.page_html::<false>(&path, &page.name),
                         LazyLock::new(Box::new(move || {
@@ -220,6 +230,7 @@ impl Gallery {
                                 pages: page_items.clone(),
                                 path: path.push(page.name.clone()).clone(),
                                 relative: None,
+                                og_image: root_thumbnail,
                             })
                         })),
                     );
@@ -279,6 +290,7 @@ impl Gallery {
                     pages: page_items,
                     path: CategoryPath::ROOT,
                     relative: None,
+                    og_image: root_og_image.clone(),
                 })
             })),
         );
@@ -439,6 +451,7 @@ pub struct AppProps<'a> {
     pub path: CategoryPath,
     pub title: AttrValue,
     pub description: Option<AttrValue>,
+    pub og_image: Option<(String, (u32, u32))>,
     pub head: Html,
     pub body: Html,
     pub sidebar: Html,
@@ -641,8 +654,6 @@ pub fn app(props: AppProps<'_>) -> Html {
         .into(),
     );
 
-    let thumbnail = props.gallery.thumbnail();
-
     html! {
         <html lang="en">
             <head>
@@ -650,7 +661,8 @@ pub fn app(props: AppProps<'_>) -> Html {
                 <title>{props.title.clone()}</title>
                 <meta property="og:title" content={props.title.clone()} />
                 if let Some(description) = props.description.clone() {
-                    <meta name="description" property="og:description" content={description}/>
+                    <meta name="description" content={description.clone()}/>
+                    <meta property="og:description" content={description}/>
                 }
                 if !props.gallery.config.categories.is_empty() {
                     <meta name="keywords" content={props.gallery.config.categories.join(",")}/>
@@ -670,11 +682,12 @@ pub fn app(props: AppProps<'_>) -> Html {
                 <meta property="og:type" content="website" />
                 if let Some(root) = &props.gallery.config.root_url {
                     <link rel="canonical" href={format!("{root}{}", props.canonical)}/>
-                    if let Some((path, thumbnail)) = thumbnail {
+                    if let Some((og_image, (width, height))) = &props.og_image {
                         <meta property="og:image" content={format!(
-                            "{root}{}",
-                            props.gallery.config.thumbnail::<true>(&path, &thumbnail.name)
+                            "{root}{og_image}",
                         )}/>
+                        <meta property="og:image:width" content={width.to_string()}/>
+                        <meta property="og:image:height" content={height.to_string()}/>
                     }
                 }
                 if let Some(relative) = &props.relative {
