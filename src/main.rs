@@ -11,6 +11,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use serve::serve;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::{Mutex, OnceLock};
@@ -45,7 +46,7 @@ enum Command {
     Serve,
     /// Build static gallery website.
     Build,
-    /// Use ollama llava:latest to generate missing photo descriptions.
+    /// Use an AI model (via `ollama`) to generate missing photo descriptions.
     ImageAi,
 }
 
@@ -359,21 +360,33 @@ fn main() {
     if matches!(args.command, Command::ImageAi) {
         gallery.visit_items(|path, item| {
             if let Some(photo) = item.photo() {
-                let category_name = if path.is_root() {
-                    gallery.config.title.as_str()
+                let mut prompt = String::new();
+                if path.is_root() {
+                    writeln!(prompt, "The gallery is {}.", gallery.config.title).unwrap();
                 } else {
-                    gallery.category(path).unwrap().name.as_str()
-                };
+                    writeln!(
+                        prompt,
+                        "The category is {}.",
+                        gallery.category(path).unwrap().name
+                    )
+                    .unwrap();
+                }
+                if let Some(hint) = &photo.config.ai_description_hint {
+                    writeln!(prompt, "A hint has been provided: {hint}.").unwrap();
+                }
+
+                writeln!(prompt, "Describe the photo.").unwrap();
 
                 let prompt = ImageAiPrompt {
-                    prompt: &format!("The category is {category_name}. Describe the photo up to 2 sentences. Do not speculate. Do not mention text or lack of text."),
-                    system_prompt: "You are a photo summarizer tasked with generating descriptions for photos on an gallery website, with an emphasis on accessibility. Visually-impaired people will rely on your descriptions, so make them accurate and interesting.",
+                    prompt: &prompt,
                     photo,
                     config: &gallery.config,
                 };
 
                 if let Some(description) = photo.config.description.as_ref() {
-                    if photo.config.ai_description_output_checksum != Some(checksum(description.as_bytes())) {
+                    if photo.config.ai_description_output_checksum
+                        != Some(checksum(description.as_bytes()))
+                    {
                         println!("keeping manual description for {}", photo.name);
                         return;
                     }
@@ -409,7 +422,8 @@ fn main() {
                 let mut doc = existing.parse::<DocumentMut>().unwrap();
                 doc["description"] = toml_edit::value(summary.clone());
                 doc["ai_description_input_checksum"] = toml_edit::value(input_checksum);
-                doc["ai_description_output_checksum"] = toml_edit::value(checksum(&summary.as_bytes()));
+                doc["ai_description_output_checksum"] =
+                    toml_edit::value(checksum(&summary.as_bytes()));
                 file.seek(SeekFrom::Start(0)).unwrap();
                 file.set_len(0).unwrap();
                 file.write_all(doc.to_string().as_bytes()).unwrap();

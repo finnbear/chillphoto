@@ -14,7 +14,7 @@ chillphoto init     # initialize top-level config
 chillphoto serve    # preview the gallery
 chillphoto build    # generate the gallery
 
-ollama pull llava   # install dependency
+ollama pull gemma3  # install dependency
 chillphoto image-ai # AI-generate photo descriptions based on thumbnails
 ```
 
@@ -76,6 +76,8 @@ thumbnail_crop_center = {
     # 0.0 - 1.0
     y = 0.5
 }
+# correct AI hallucinations without needing to manually overwrite everything.
+ai_description_hint = "it's dirt not sand"
 ```
 
 ### Page config

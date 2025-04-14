@@ -34,6 +34,10 @@ pub struct GalleryConfig {
     pub thumbnail_format: OutputFormat,
     #[serde(default = "default_thumbnail_resolution")]
     pub thumbnail_resolution: u32,
+    #[serde(default = "default_image_ai_model")]
+    pub image_ai_model: String,
+    #[serde(default = "default_ai_description_system_prompt")]
+    pub ai_description_system_prompt: String,
 }
 
 fn default_input() -> String {
@@ -74,6 +78,14 @@ fn default_thumbnail_resolution() -> u32 {
 
 fn default_output() -> String {
     String::from("./output")
+}
+
+fn default_image_ai_model() -> String {
+    String::from("gemma3")
+}
+
+fn default_ai_description_system_prompt() -> String {
+    String::from("You are a photo summarizer tasked with generating descriptions for photos on an gallery website, with an emphasis on accessibility. Visually-impaired people will rely on your descriptions, so make them accurate and interesting. You never explicitly speculate, mention a lack of text, or use more than 2 sentences.")
 }
 
 impl GalleryConfig {
@@ -185,6 +197,8 @@ pub struct PhotoConfig {
     pub description: Option<String>,
     #[serde(default)]
     pub location: Option<String>,
+    #[serde(default)]
+    pub ai_description_hint: Option<String>,
     #[serde(default)]
     pub ai_description_input_checksum: Option<String>,
     #[serde(default)]

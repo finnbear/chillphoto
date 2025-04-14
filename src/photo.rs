@@ -85,7 +85,12 @@ impl Photo {
 
     pub fn thumbnail(&self, config: &GalleryConfig) -> &RgbImage {
         self.thumbnail
-            .get_or_init(|| generate_thumbnail(config, self.image(config), &self.config))
+            .get_or_init(|| self.custom_thumbnail(config, config.thumbnail_resolution))
+    }
+
+    /// Not cached.
+    pub fn custom_thumbnail(&self, config: &GalleryConfig, resolution: u32) -> RgbImage {
+        generate_thumbnail(self.image(config), resolution, &self.config)
     }
 }
 
@@ -126,11 +131,7 @@ fn resize_dimensions(width: u32, height: u32, nwidth: u32, nheight: u32) -> (u32
     }
 }
 
-fn generate_thumbnail(
-    config: &GalleryConfig,
-    img: &RgbImage,
-    photo_config: &PhotoConfig,
-) -> RgbImage {
+fn generate_thumbnail(img: &RgbImage, resolution: u32, photo_config: &PhotoConfig) -> RgbImage {
     let (width, height) = img.dimensions();
     let (size, x_offset, y_offset) = if false {
         let size = width.min(height);
@@ -153,12 +154,7 @@ fn generate_thumbnail(
     };
 
     let cropped = imageops::crop_imm(img, x_offset, y_offset, size, size);
-    imageops::resize(
-        &*cropped,
-        config.thumbnail_resolution,
-        config.thumbnail_resolution,
-        FilterType::Lanczos3,
-    )
+    imageops::resize(&*cropped, resolution, resolution, FilterType::Lanczos3)
 }
 
 fn resize_image(img: &RgbImage, resolution: u32) -> RgbImage {
