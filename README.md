@@ -49,6 +49,8 @@ description = "..."
 order = 0
 # photo in the category
 thumbnail = "Photo1"
+# correct AI hallucinations without needing to manually overwrite everything.
+ai_description_hint = "all photos have dirt not sand"
 ```
 
 ### Photo config

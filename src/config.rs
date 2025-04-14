@@ -237,6 +237,8 @@ pub struct CategoryConfig {
     pub order: i64,
     pub thumbnail: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    pub ai_description_hint: Option<String>,
 }
 
 impl Default for CategoryConfig {

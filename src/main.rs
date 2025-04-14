@@ -362,14 +362,28 @@ fn main() {
             if let Some(photo) = item.photo() {
                 let mut prompt = String::new();
                 if path.is_root() {
-                    writeln!(prompt, "The gallery is {}.", gallery.config.title).unwrap();
-                } else {
                     writeln!(
                         prompt,
-                        "The category is {}.",
-                        gallery.category(path).unwrap().name
+                        "The photo is in the gallery: {}.",
+                        gallery.config.title
                     )
                     .unwrap();
+                    if let Some(description) = &gallery.config.description {
+                        writeln!(prompt, "The gallery description is: {description}.",).unwrap();
+                    }
+                } else {
+                    let category = gallery.category(path).unwrap();
+                    writeln!(prompt, "The photo is in the category: {}.", category.name).unwrap();
+                    if let Some(description) = &category.config.description {
+                        writeln!(prompt, "The category description is: {description}.",).unwrap();
+                    }
+                    if let Some(hint) = &category.config.ai_description_hint {
+                        writeln!(
+                            prompt,
+                            "A hint for the entire category been provided: {hint}."
+                        )
+                        .unwrap();
+                    }
                 }
                 if let Some(hint) = &photo.config.ai_description_hint {
                     writeln!(prompt, "A hint has been provided: {hint}.").unwrap();
