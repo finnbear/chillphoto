@@ -123,6 +123,10 @@ Licensed under either of
 
 at your option.
 
+## Acknowledgements
+
+The current default, and only, theme is heavily based on [ZenPage](https://github.com/zenphoto/zenphoto/tree/master/themes/zenpage) by [Malte Müller](https://maltem.de/).
+
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
