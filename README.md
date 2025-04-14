@@ -25,6 +25,7 @@ chillphoto image-ai # AI-generate photo descriptions based on thumbnails
   chillphoto.toml           # top-level config
   favicon.png               # favicon
   head.html                 # HTML to include in <head>
+  home.{txt,md,html}        # gallery homepage caption
   About.{txt,md,html}       # page, linked on sidebar
   About.toml                # page config
   Category 2.{txt,md,html}  # category caption
@@ -34,29 +35,33 @@ chillphoto image-ai # AI-generate photo descriptions based on thumbnails
     Photo1.{txt,md,html}    # photo caption
   Category 1.toml           # category config
   /Category 2               # category
-    Photo3.JPG              # photo (w/ EXIF)
+    Photo3.{JPG,PNG}        # photo (w/ EXIF)
 ```
 
 ### Category config
 
+All fields are optional.
 ```toml
+# displayed with gallery thumbnail, used in metadata
 description = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0
+# photo in the category
 thumbnail = "Photo1"
 ```
 
 ### Photo config
 
+All fields are optional.
 ```toml
-# optional alt text
+# alt text
 description = "..."
-# optional
+# to display in details, etc.
 location = "..."
-# optional override
+# override
 author = "Full Name"
-# optional override
+# override
 license_url = "https://creativecommons.org/licenses/by-sa/4.0/deed.en"
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
@@ -75,7 +80,9 @@ thumbnail_crop_center = {
 
 ### Page config
 
+All fields are optional.
 ```toml
+# used in metadata
 description = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.

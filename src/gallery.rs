@@ -14,6 +14,7 @@ pub struct Gallery {
     pub favicon: Option<(Vec<u8>, OnceLock<RgbImage>)>,
     pub config: GalleryConfig,
     pub head_html: Option<String>,
+    pub home_text: Option<RichText>,
 }
 
 impl Gallery {

@@ -103,6 +103,7 @@ fn main() {
             favicon: None,
             config,
             head_html: None,
+            home_text: None,
         },
         item_configs: HashMap::new(),
     });
@@ -211,19 +212,29 @@ fn main() {
     let mut photo_texts = 0usize;
     let mut pages = 0usize;
     let mut page_configs = 0usize;
-    let mut match_pages = |children: &mut Vec<Item>| {
+    let mut match_pages = |mut home: Option<&mut Option<RichText>>, children: &mut Vec<Item>| {
         let mut matches = Vec::<(String, RichText)>::new();
         for name in children
             .iter()
-            .filter_map(|i| i.photo().map(|p| &p.name).or(i.category().map(|c| &c.name)))
+            .filter_map(|i| {
+                i.photo()
+                    .map(|p| p.name.as_str())
+                    .or(i.category().map(|c| c.name.as_str()))
+            })
+            .chain(std::iter::once("home"))
         {
             for page in children.iter().filter_map(|i| i.page()) {
                 if *name == page.name {
-                    matches.push((name.clone(), page.text.clone()));
+                    matches.push((name.to_owned(), page.text.clone()));
                 }
             }
         }
         for (name, text) in matches {
+            if let Some(home) = &mut home {
+                if name == "home" {
+                    **home = Some(text.clone());
+                }
+            }
             children.retain_mut(|child| {
                 match child {
                     Item::Photo(photo) => {
@@ -238,13 +249,15 @@ fn main() {
                             category_texts += 1;
                         }
                     }
-                    Item::Page(page) => return page.name != name,
+                    Item::Page(page) => {
+                        return page.name != name && (home.is_none() || page.name != "home")
+                    }
                 }
                 true
             });
         }
     };
-    match_pages(&mut gallery.children);
+    match_pages(Some(&mut gallery.home_text), &mut gallery.children);
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
             if let Some(config) = item_configs.remove(&path.push(category.slug())) {
@@ -253,7 +266,7 @@ fn main() {
                 category_configs += 1;
             }
 
-            match_pages(&mut category.children);
+            match_pages(None, &mut category.children);
 
             let mut first_date = Option::<NaiveDate>::None;
 

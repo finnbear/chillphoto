@@ -285,7 +285,12 @@ impl Gallery {
                     title: self.config.title.clone().into(),
                     description: self.config.description.clone().map(|d| d.into()),
                     head: website_structured_data,
-                    body: render_items(self, &CategoryPath::ROOT, &self.children),
+                    body: html! {<>
+                        {render_items(self, &CategoryPath::ROOT, &self.children)}
+                        if let Some(text) = &self.home_text {
+                            {rich_text_html(text)}
+                        }
+                    </>},
                     sidebar: Html::default(),
                     pages: page_items,
                     path: CategoryPath::ROOT,
