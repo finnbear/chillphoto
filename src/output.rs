@@ -731,8 +731,20 @@ pub fn app(props: AppProps<'_>) -> Html {
                         <link rel="next" href={next.clone()}/>
                         <link rel="prerender" href={next.clone()}/>
                     }
-                    {write_speculation_rules(relative.previous.clone().into_iter().chain(relative.next.clone()).collect())}
                 }
+                {write_speculation_rules(
+                    props
+                        .relative
+                        .as_ref()
+                        .map(|relative|
+                            relative
+                                .previous
+                                .clone()
+                                .into_iter()
+                                .chain(relative.next.clone()).collect()
+                        )
+                        .unwrap_or_default()
+                )}
                 // Favicon
                 {props.head.clone()}
                 if let Some(content) = props.gallery.head_html.clone() {
@@ -957,22 +969,59 @@ pub fn write_structured_data<T: Serialize>(data: T) -> Html {
     )
 }
 
+/// https://developer.chrome.com/docs/web-platform/prerender-pages
 pub fn write_speculation_rules(urls: Vec<String>) -> Html {
     #[derive(Serialize)]
     struct SpeculationRules {
-        prerender: Vec<UrlSet>,
+        prerender: Vec<Rule>,
     }
 
     #[derive(Serialize)]
-    struct UrlSet {
-        urls: Vec<String>,
+    #[serde(untagged)]
+    enum Rule {
+        List {
+            urls: Vec<String>,
+            eagerness: String,
+        },
+        Document {
+            #[serde(rename = "where")]
+            _where: Expr,
+            eagerness: String,
+        },
+    }
+
+    #[derive(Serialize)]
+    enum Expr {
+        #[serde(rename = "and")]
+        And(Vec<Expr>),
+        #[serde(rename = "href_matches")]
+        HrefMatches(String),
+        #[serde(rename = "not")]
+        Not(Box<Expr>),
+        #[serde(rename = "selector_matches")]
+        SelectorMatches(String),
     }
 
     Html::from_html_unchecked(
         format!(
             "<script type=\"speculationrules\">\n{}\n</script>",
             serde_json::to_string_pretty(&SpeculationRules {
-                prerender: vec![UrlSet { urls }]
+                prerender: (!urls.is_empty())
+                    .then_some(Rule::List {
+                        urls,
+                        eagerness: "immediate".to_owned(),
+                    })
+                    .into_iter()
+                    .chain(std::iter::once(Rule::Document {
+                        _where: Expr::And(vec![
+                            Expr::HrefMatches("/*".to_owned()),
+                            Expr::Not(Box::new(Expr::SelectorMatches(
+                                "[rel~=nofollow]".to_owned()
+                            ))),
+                        ]),
+                        eagerness: "moderate".to_owned()
+                    }))
+                    .collect()
             })
             .unwrap()
         )
