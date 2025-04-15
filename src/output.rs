@@ -395,7 +395,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                         Some(html!{
                             <a
                                 class="thumbnail_container category_item"
-                                href={gallery.config.category_html::<true>(&photo_path, &category.slug())}
+                                href={gallery.config.category_html::<true>(&category_path, &category.slug())}
                             >
                                 <img
                                     class="thumbnail"
@@ -731,6 +731,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                         <link rel="next" href={next.clone()}/>
                         <link rel="prerender" href={next.clone()}/>
                     }
+                    {write_speculation_rules(relative.previous.clone().into_iter().chain(relative.next.clone()).collect())}
                 }
                 // Favicon
                 {props.head.clone()}
@@ -949,6 +950,29 @@ pub fn write_structured_data<T: Serialize>(data: T) -> Html {
             serde_json::to_string_pretty(&Context {
                 context: "https://schema.org",
                 data,
+            })
+            .unwrap()
+        )
+        .into(),
+    )
+}
+
+pub fn write_speculation_rules(urls: Vec<String>) -> Html {
+    #[derive(Serialize)]
+    struct SpeculationRules {
+        prerender: Vec<UrlSet>,
+    }
+
+    #[derive(Serialize)]
+    struct UrlSet {
+        urls: Vec<String>,
+    }
+
+    Html::from_html_unchecked(
+        format!(
+            "<script type=\"speculationrules\">\n{}\n</script>",
+            serde_json::to_string_pretty(&SpeculationRules {
+                prerender: vec![UrlSet { urls }]
             })
             .unwrap()
         )
