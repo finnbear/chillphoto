@@ -100,7 +100,7 @@ order = 0
 - [x] Arbitrarily-nested photo categories
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Input essential EXIF metadata
-- [x] Output HTML, Sitemap, structured data, and Open Graph metadata
+- [x] Output HTML, Sitemap, PWA, structured data, and Open Graph metadata
 - [x] AI photo descriptions
 - [ ] Pagination
 - [ ] Hot-reloading

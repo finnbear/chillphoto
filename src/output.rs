@@ -10,6 +10,9 @@ use serde::Serialize;
 use std::{collections::HashMap, fmt::Write, io::Cursor, sync::LazyLock};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
+/// Must be at least 144.
+const MANIFEST_ICON_RESOLUTION: u32 = 256;
+
 impl Gallery {
     pub fn output<'a>(
         &'a self,
@@ -254,6 +257,19 @@ impl Gallery {
             LazyLock::new(Box::new(move || write_manifest(self))),
         );
 
+        if let Some((_, thumbnail)) = self.thumbnail() {
+            let manifest_path = "/manifest.png".to_owned();
+            ret.insert(
+                manifest_path.clone(),
+                LazyLock::new(Box::new(move || {
+                    write_image(
+                        &thumbnail.custom_thumbnail(&self.config, MANIFEST_ICON_RESOLUTION),
+                        &manifest_path,
+                    )
+                })),
+            );
+        }
+
         ret.insert(
             self.config.index_html::<false>(),
             LazyLock::new(Box::new(move || {
@@ -375,10 +391,11 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                     }
                     Item::Category(category) => {
                         let (photo_path, photo) = category.thumbnail(category_path)?;
+                        let thumbnail_url = gallery.config.thumbnail::<true>(&photo_path, &photo.name);
                         Some(html!{
                             <a
                                 class="thumbnail_container category_item"
-                                href={gallery.config.category_html::<true>(&category_path, &category.slug())}
+                                href={gallery.config.category_html::<true>(&photo_path, &category.slug())}
                             >
                                 <img
                                     class="thumbnail"
@@ -388,7 +405,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                         gallery.config.thumbnail_resolution
                                     )}
                                     alt={photo.name.clone()}
-                                    src={gallery.config.thumbnail::<true>(&photo_path, &photo.name)}
+                                    src={thumbnail_url.clone()}
                                 />
                                 <div class="category_item_info">
                                     <h2 class="category_item_name">
@@ -408,6 +425,16 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                         </div>
                                     }
                                 </div>
+                                {write_structured_data(
+                                    photo_structured_data(
+                                        gallery,
+                                        photo,
+                                        gallery.config.photo_html::<true>(&photo_path, &photo.name),
+                                        gallery.config.photo::<true>(&photo_path, &photo.name),
+                                        Some(thumbnail_url),
+                                        false
+                                    )
+                                )}
                             </a>
                         })
                     }
@@ -877,6 +904,14 @@ fn write_manifest(gallery: &Gallery) -> Vec<u8> {
         categories: Vec<String>,
         start_url: String,
         handle_links: String,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        icons: Vec<Icon>,
+    }
+
+    #[derive(Serialize)]
+    struct Icon {
+        src: String,
+        sizes: String,
     }
 
     let manifest = Manifest {
@@ -886,6 +921,14 @@ fn write_manifest(gallery: &Gallery) -> Vec<u8> {
         categories: gallery.config.categories.clone(),
         start_url: "/".to_owned(),
         handle_links: "not-preferred".to_owned(),
+        icons: gallery
+            .thumbnail()
+            .map(|(_, _)| Icon {
+                src: "/manifest.png".to_owned(),
+                sizes: format!("{}x{}", MANIFEST_ICON_RESOLUTION, MANIFEST_ICON_RESOLUTION),
+            })
+            .into_iter()
+            .collect::<Vec<_>>(),
     };
 
     serde_json::to_string(&manifest).unwrap().into_bytes()

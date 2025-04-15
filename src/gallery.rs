@@ -201,12 +201,18 @@ impl Category {
 
     pub fn thumbnail(&self, path: &CategoryPath) -> Option<(CategoryPath, &Photo)> {
         let mut ret = Option::<(CategoryPath, &Photo)>::None;
-        self.visit_items(&path, |path, item| {
-            if let Item::Photo(photo) = item {
+        self.visit_items(&path, |path, item| match item {
+            Item::Photo(photo) => {
                 if ret.is_none() || self.config.thumbnail.as_ref() == Some(&photo.name) {
                     ret = Some((path.clone(), photo));
                 }
             }
+            Item::Category(category) => {
+                if ret.is_none() || self.config.thumbnail.as_ref() == Some(&category.name) {
+                    ret = category.thumbnail(path);
+                }
+            }
+            _ => {}
         });
         ret
     }
