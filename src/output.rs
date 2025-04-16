@@ -690,6 +690,47 @@ pub fn app(props: AppProps<'_>) -> Html {
         .into(),
     );
 
+    let breadcrumbs = props
+        .path
+        .iter_paths()
+        .enumerate()
+        .map(|(i, path)| {
+            if path != props.path {
+                BreadcrumbListElement {
+                    _type: "ListItem",
+                    name: props
+                        .gallery
+                        .category(&path)
+                        .map(|c| c.name.as_str())
+                        .unwrap_or("Home")
+                        .to_owned(),
+                    position: i + 1,
+                    item: Some(if path.is_root() {
+                        props.gallery.config.index_html::<true>()
+                    } else {
+                        props.gallery.config.category_html::<true>(
+                            &path.pop().unwrap(),
+                            path.last_segment().unwrap(),
+                        )
+                    }),
+                }
+            } else {
+                BreadcrumbListElement {
+                    _type: "ListItem",
+                    name: props
+                        .gallery
+                        .category(&path)
+                        .map(|c| c.name.as_str())
+                        .or(path.last_segment())
+                        .unwrap_or("Home")
+                        .to_owned(),
+                    position: i + 1,
+                    item: None,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
     html! {
         <html lang="en">
             <head>
@@ -784,26 +825,33 @@ pub fn app(props: AppProps<'_>) -> Html {
                             }
                         </header>
                         <nav id="breadcrumbs" data-nosnippet={"nosnippet"}>
-                            {join(&props.path.iter_paths().map(|path| if path != props.path {
-                                html!{
+                            {join(&breadcrumbs.iter().map(|breadcrumb| html!{
+                                if let Some(href) = &breadcrumb.item {
                                     <a
                                         class={"breadcrumb"}
-                                        href={if path.is_root() {
-                                            props.gallery.config.index_html::<true>()
-                                        } else {
-                                            props.gallery.config.category_html::<true>(&path.pop().unwrap(), path.last_segment().unwrap())
-                                        }}
-                                    >{props.gallery.category(&path).map(|c| c.name.as_str()).unwrap_or("Home").to_owned()}</a>
-                                }
-                            } else {
-                                html!{
+                                        href={href.clone()}
+                                    >{breadcrumb.name.clone()}</a>
+                                } else {
                                     <span
                                         class={"breadcrumb breadcrumb_final"}
-                                    >{props.gallery.category(&path).map(|c| c.name.as_str()).or(path.last_segment()).unwrap_or("Home").to_owned()}</span>
+                                    >{breadcrumb.name.clone()}</span>
                                 }
                             }).collect::<Vec<_>>(), &html!{{" » "}})}
                             if let Some(relative) = &props.relative {
                                 {format!(" ({}/{})", relative.index + 1, relative.count)}
+                            }
+                            if breadcrumbs.len() > 1 {
+                                if let Some(root) = &props.gallery.config.root_url {
+                                    {write_structured_data(BreadcrumbList{
+                                        _type: "BreadcrumbList",
+                                        item_list_element: breadcrumbs.into_iter().skip(1).map(|mut b| {
+                                            // Don't do Home.
+                                            b.position -= 1;
+                                            b.item = b.item.map(|item| format!("{root}{item}"));
+                                            b
+                                        }).collect(),
+                                    })}
+                                }
                             }
                         </nav>
                     </section>
@@ -1172,4 +1220,22 @@ fn photo_structured_data(
         location_created: location.clone(),
         content_location: location,
     }
+}
+
+#[derive(Serialize)]
+struct BreadcrumbList {
+    #[serde(rename = "@type")]
+    _type: &'static str,
+    #[serde(rename = "itemListElement")]
+    item_list_element: Vec<BreadcrumbListElement>,
+}
+
+#[derive(Serialize)]
+struct BreadcrumbListElement {
+    #[serde(rename = "@type")]
+    _type: &'static str,
+    position: usize,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    item: Option<String>,
 }
