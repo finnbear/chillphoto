@@ -168,6 +168,12 @@ impl Gallery {
                                                 }
                                             </div>
                                         }
+                                        if let Some(description) = &photo.config.description {
+                                            <details class={"sidebar_details_panel_text"}>
+                                                <summary>{"Description"}</summary>
+                                                {description.clone()}
+                                            </details>
+                                        }
                                     </div>
                                 },
                                 pages: page_items,
@@ -630,6 +636,10 @@ pub fn app(props: AppProps<'_>) -> Html {
 
         .sidebar_details_panel_text {
             font-size: 0.9rem;
+        }
+
+        details.sidebar_details_panel_text > summary {
+            margin-left: .2rem;
         }
   
         .sidebar_panel_list_item::before { 
