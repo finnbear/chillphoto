@@ -499,6 +499,10 @@ pub fn app(props: AppProps<'_>) -> Html {
             --colored-text-dark-background: #e0ff28;
         }
 
+        @view-transition {
+            navigation: auto;
+        }
+
         html {
             font-size: calc(8px + 0.8vw);
         }
