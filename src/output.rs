@@ -7,6 +7,12 @@ use crate::{
 use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
 use serde::Serialize;
+use sitemap_rs::{
+    image::Image,
+    url::{ChangeFrequency, Url},
+    url_builder::UrlBuilder,
+    url_set::UrlSet,
+};
 use std::{collections::HashMap, fmt::Write, io::Cursor, sync::LazyLock};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
@@ -31,6 +37,7 @@ impl Gallery {
             String,
             LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
         >::new();
+        let mut sitemap = Vec::<Url>::new();
 
         let root_og_image = self.thumbnail().map(|(path, preview)| {
             (
@@ -80,6 +87,17 @@ impl Gallery {
                         })),
                     );
 
+                    let canonical = config.photo_html::<true>(&path, &photo.name);
+                    if let Some(root) = &self.config.root_url {
+                        sitemap.push(UrlBuilder::new(format!("{root}{canonical}"))
+                            .change_frequency(ChangeFrequency::Monthly)
+                            .images(vec![
+                                Image::new(format!("{root}{}", config.photo::<true>(&path, &photo.name))),
+                                Image::new(format!("{root}{}", config.preview::<true>(&path, &photo.name))),
+                                Image::new(format!("{root}{}", config.thumbnail::<true>(&path, &photo.name))),
+                            ]).build().unwrap())
+                    }
+
                     let page_items = page_items.clone();
                     ret.insert(
                         config.photo_html::<false>(&path, &photo.name),
@@ -87,7 +105,7 @@ impl Gallery {
                             let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.name), self.config.photo::<true>(&path, &photo.name), Some(self.config.thumbnail::<true>(&path, &photo.name)), true));
 
                             render_html(AppProps {
-                                canonical: config.photo_html::<true>(&path, &photo.name),
+                                canonical,
                                 gallery: self,
                                 title: photo.name.clone().into(),
                                 description: photo.config.description.clone().map(|s| s.into()),
@@ -290,7 +308,7 @@ impl Gallery {
                     #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
                     description: Option<String>,
                     #[serde(rename = "copyrightHolder", skip_serializing_if = "Option::is_none")]
-                    copyright_holder: Option<String>,
+                    copyright_holder: Option<PersonStructuredData>,
                 }
 
                 let website_structured_data = write_structured_data(WebSiteStructuredData {
@@ -298,7 +316,10 @@ impl Gallery {
                     url: self.config.root_url.clone(),
                     name: self.config.title.clone(),
                     description: self.config.description.clone(),
-                    copyright_holder: self.config.author.clone(),
+                    copyright_holder: self.config.author.clone().map(|name| PersonStructuredData {
+                        _type: "Person",
+                        name,
+                    }),
                 });
 
                 render_html(AppProps {
@@ -323,16 +344,34 @@ impl Gallery {
         );
 
         if let Some(root_url) = &self.config.root_url {
-            let mut pages = ret
+            for page in ret
                 .keys()
                 .filter(|k| k.ends_with('/') || k.ends_with(".html"))
-                .map(|s| format!("{root_url}{}", s.trim_end_matches("index.html")))
-                .collect::<Vec<_>>();
-            pages.sort();
-            let sitemap = pages.join("\n");
+                .map(|s| {
+                    Url::builder(format!("{root_url}{}", s.trim_end_matches("index.html")))
+                        .change_frequency(ChangeFrequency::Weekly)
+                        .build()
+                        .unwrap()
+                })
+            {
+                if sitemap.iter().all(|url| url.location != page.location) {
+                    sitemap.push(page);
+                }
+            }
+            sitemap.sort_by_key(|url| {
+                (
+                    url.location.chars().filter(|c| *c == '/').count(),
+                    url.location.clone(),
+                )
+            });
+            let sitemap = UrlSet::new(sitemap).unwrap();
             ret.insert(
-                "/sitemap.txt".to_owned(),
-                LazyLock::new(Box::new(move || sitemap.into_bytes())),
+                "/sitemap.xml".to_owned(),
+                LazyLock::new(Box::new(move || {
+                    let mut ret = Vec::<u8>::new();
+                    sitemap.write(&mut ret).unwrap();
+                    ret
+                })),
             );
         }
 
@@ -346,7 +385,7 @@ impl Gallery {
                 }
                 writeln!(robots_txt, "Allow: /").unwrap();
                 if let Some(url) = &self.config.root_url {
-                    writeln!(robots_txt, "Sitemap: {url}/sitemap.txt").unwrap();
+                    writeln!(robots_txt, "Sitemap: {url}/sitemap.xml").unwrap();
                 }
                 robots_txt.into_bytes()
             })),
@@ -479,6 +518,11 @@ fn render_html(props: AppProps<'_>) -> Vec<u8> {
         .unwrap();
 
     html.insert_str(0, "<!DOCTYPE html>\n");
+
+    html = html
+        .lines()
+        .filter(|l| !l.chars().all(|c| c.is_whitespace()))
+        .collect();
 
     html.into_bytes()
 }
@@ -769,6 +813,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                 <meta property="og:type" content="website" />
                 if let Some(root) = &props.gallery.config.root_url {
                     <link rel="canonical" href={format!("{root}{}", props.canonical)}/>
+                    <meta property="og:url" content={format!("{root}{}", props.canonical)}/>
                     if let Some((og_image, (width, height))) = &props.og_image {
                         <meta property="og:image" content={format!(
                             "{root}{og_image}",
