@@ -186,6 +186,12 @@ impl Gallery {
                                                 }
                                             </div>
                                         }
+                                        if photo.config.exposure != 0.0 {
+                                            <details class={"sidebar_details_panel_text"}>
+                                                <summary>{"Adjustments"}</summary>
+                                                {format!("{:+}EV exposure", photo.config.exposure)}
+                                            </details>
+                                        }
                                         if let Some(description) = &photo.config.description {
                                             <details class={"sidebar_details_panel_text"}>
                                                 <summary>{"Description"}</summary>
