@@ -64,7 +64,21 @@ impl Photo {
                 image.apply_orientation(orientation);
             }
 
-            resize_image(&image.to_rgb8(), config.photo_resolution)
+            let mut rgb = image.to_rgb8();
+
+            if self.config.exposure != 0.0 {
+                for pixel in rgb.pixels_mut() {
+                    const GAMMA: f32 = 2.2;
+                    pixel.0 = pixel.0.map(|c| {
+                        (((c as f32 * (1.0 / u8::MAX as f32)).powf(GAMMA)
+                            * 2f32.powf(self.config.exposure as f32))
+                        .powf(1.0 / GAMMA)
+                            * u8::MAX as f32) as u8
+                    });
+                }
+            }
+
+            resize_image(&rgb, config.photo_resolution)
         })
     }
 

@@ -209,6 +209,9 @@ pub struct PhotoConfig {
     pub thumbnail_crop_factor: f64,
     #[serde(default = "default_thumbnail_crop_center")]
     pub thumbnail_crop_center: Point2,
+    /// Stops of exposure to add.
+    #[serde(default)]
+    pub exposure: f32,
 }
 
 fn default_thumbnail_crop_factor() -> f64 {

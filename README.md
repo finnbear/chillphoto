@@ -80,6 +80,8 @@ thumbnail_crop_center = {
 }
 # correct AI hallucinations without needing to manually overwrite everything.
 ai_description_hint = "it's dirt not sand"
+# stops of exposure to digitally add (or subtract).
+exposure = 0.33
 ```
 
 ### Page config
@@ -102,6 +104,7 @@ order = 0
 - [x] Input essential EXIF metadata
 - [x] Output HTML, Sitemap, PWA, structured data, and Open Graph metadata
 - [x] AI photo descriptions
+- [x] Basic image adjustment (exposure)
 - [ ] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
