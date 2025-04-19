@@ -522,6 +522,7 @@ fn render_html(props: AppProps<'_>) -> Vec<u8> {
     html = html
         .lines()
         .filter(|l| !l.chars().all(|c| c.is_whitespace()))
+        .map(|l| format!("{l}\n"))
         .collect();
 
     html.into_bytes()
