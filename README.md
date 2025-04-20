@@ -38,6 +38,30 @@ chillphoto image-ai # AI-generate photo descriptions based on thumbnails
     Photo3.{JPG,PNG}        # photo (w/ EXIF)
 ```
 
+### Top-level config
+
+```
+input = "src/**/*.{JPG,jpg,txt,png,md,html,toml}"
+output = "./build"
+title = "Photos!"
+author = "Full Name"
+author_url = "https://fullname.me"
+root_url = "https://example.com"
+license_url = "https://creativecommons.org/licenses/by-sa/4.0/deed.en"
+acquire_license_url = "https://example.com/Copyright/"
+description = "My favorite photos"
+categories = ["photo"]
+disallow_ai_training = false
+photo_resolution = 3840
+photo_format = "jpg"
+preview_resolution = 1920
+preview_format = "jpg"
+thumbnail_resolution = 100
+thumbnail_format = "jpg"
+image_ai_model = "gemma3"
+# ai_description_system_prompt = "override system prompt"
+```
+
 ### Category config
 
 All fields are optional.
