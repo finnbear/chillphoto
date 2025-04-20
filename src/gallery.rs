@@ -100,7 +100,6 @@ impl Gallery {
             } else {
                 current_items.push(Item::Category(Category {
                     name: category_name.to_string(),
-                    creation_date: None,
                     text: None,
                     children: Vec::new(),
                     config: CategoryConfig::default(),
@@ -188,7 +187,6 @@ impl Item {
 #[derive(Debug)]
 pub struct Category {
     pub name: String,
-    pub creation_date: Option<NaiveDate>,
     pub text: Option<RichText>,
     pub children: Vec<Item>,
     pub config: CategoryConfig,
@@ -215,6 +213,27 @@ impl Category {
             _ => {}
         });
         ret
+    }
+
+    pub fn first_and_last_dates(&self) -> Option<(NaiveDate, NaiveDate)> {
+        let mut first_date = Option::<NaiveDate>::None;
+        let mut last_date = Option::<NaiveDate>::None;
+
+        self.visit_items(&CategoryPath::ROOT, |_, child| {
+            if let Item::Photo(photo) = child {
+                if let Some(date_time) = photo.date_time() {
+                    let date = date_time.date();
+                    if first_date.map(|fd| date < fd).unwrap_or(true) {
+                        first_date = Some(date);
+                    }
+                    if last_date.map(|fd| date > fd).unwrap_or(true) {
+                        last_date = Some(date);
+                    }
+                }
+            }
+        });
+
+        first_date.zip(last_date)
     }
 
     pub fn visit_items<'a>(

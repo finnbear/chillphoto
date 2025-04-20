@@ -462,13 +462,22 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                     <h2 class="category_item_name">
                                         {category.name.clone()}
                                     </h2>
-                                    if let Some(creation_date) = category.creation_date.clone() {
-                                        <time
-                                            datetime={creation_date.to_string()}
-                                            class="category_item_creation_date"
-                                        >
-                                            {date_format(creation_date)}
-                                        </time>
+                                    if let Some((first_date, last_date)) = category.first_and_last_dates() {
+                                        <div class="category_item_dates">
+                                            <time
+                                                datetime={first_date.to_string()}
+                                            >
+                                                {first_date.year_ce().1}
+                                            </time>
+                                            <span style={(first_date.year_ce() == last_date.year_ce()).then_some("display: none;")}>
+                                                {" - "}
+                                                <time
+                                                    datetime={last_date.to_string()}
+                                                >
+                                                    {last_date.year_ce().1}
+                                                </time>
+                                            </span>
+                                        </div>
                                     }
                                     if let Some(description) = category.config.description.clone() {
                                         <div class="category_item_description">
@@ -727,7 +736,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             overflow: hidden;
         }
 
-        .category_item_creation_date {
+        .category_item_dates {
             color: black;
             font-size: 0.75rem;
         }

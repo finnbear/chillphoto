@@ -1,5 +1,5 @@
 use category_path::CategoryPath;
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDateTime;
 use clap::{Parser, Subcommand};
 use config::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
 use exif::ExifData;
@@ -268,21 +268,6 @@ fn main() {
             }
 
             match_pages(None, &mut category.children);
-
-            let mut first_date = Option::<NaiveDate>::None;
-
-            category.visit_items(&CategoryPath::ROOT, |_, child| {
-                if let Item::Photo(photo) = child {
-                    if let Some(date_time) = photo.date_time() {
-                        let date = date_time.date();
-                        if first_date.map(|fd| date < fd).unwrap_or(true) {
-                            first_date = Some(date);
-                        }
-                    }
-                }
-            });
-
-            category.creation_date = first_date;
 
             categories += 1;
         }
