@@ -16,6 +16,7 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
+use crate::spell_check::SpellChecker;
 use toml_edit::DocumentMut;
 use util::{checksum, remove_dir_contents};
 use wax::Glob;
@@ -30,6 +31,7 @@ mod output;
 mod photo;
 mod serve;
 mod util;
+mod spell_check;
 
 #[derive(Parser)]
 #[clap(name = "chillphoto", version)]
@@ -48,6 +50,8 @@ enum Command {
     Build,
     /// Use an AI model (via `ollama`) to generate missing photo descriptions.
     ImageAi,
+    /// Spell-check all text.
+    SpellCheck,
 }
 
 fn main() {
@@ -342,7 +346,30 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    if matches!(args.command, Command::ImageAi) {
+    if matches!(args.command, Command::SpellCheck) {
+        let mut spell_checker = SpellChecker::default();
+        spell_checker.spell_check(&gallery.config.title, RichTextFormat::PlainText);
+        if let Some(description) = &gallery.config.description {
+            spell_checker.spell_check(description, RichTextFormat::PlainText);
+        }
+        gallery.visit_items(|_, item| {
+            match item {
+                Item::Photo(photo) => {
+                    //spell_checker.spell_check(&photo.name, RichTextFormat::PlainText);
+                    if let Some(description) = &photo.config.description {
+                        spell_checker.spell_check(description, RichTextFormat::PlainText);
+                    }
+                }
+                Item::Category(category) => {
+
+                }
+                Item::Page(page) => {
+                    spell_checker.spell_check(&page.text.content, page.text.format);
+                }
+            }
+        });
+        return;
+    } else if matches!(args.command, Command::ImageAi) {
         gallery.visit_items(|path, item| {
             if let Some(photo) = item.photo() {
                 let mut prompt = String::new();
