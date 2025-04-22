@@ -48,6 +48,13 @@ impl Gallery {
         self.category(path).map(|c| &c.children)
     }
 
+    pub fn title_or_category_name(&self, path: &CategoryPath) -> &str {
+        if path.is_root() {
+            return self.config.title.as_str();
+        }
+        self.category(path).map(|c| c.name.as_str()).unwrap()
+    }
+
     pub fn category(&self, path: &CategoryPath) -> Option<&Category> {
         if path.is_root() {
             return None;

@@ -104,10 +104,12 @@ impl Gallery {
                         LazyLock::new(Box::new(move || {
                             let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.name), self.config.photo::<true>(&path, &photo.name), Some(self.config.thumbnail::<true>(&path, &photo.name)), true));
 
+                            let group = self.title_or_category_name(&path);
+
                             render_html(AppProps {
                                 canonical,
                                 gallery: self,
-                                title: photo.name.clone().into(),
+                                title: format!("{} | {group}", photo.name.clone()).into(),
                                 description: photo.config.description.clone().map(|s| s.into()),
                                 head: photo_structured_data,
                                 body: html! {<>
@@ -806,7 +808,8 @@ pub fn app(props: AppProps<'_>) -> Html {
             <head>
                 <meta charset="UTF-8"/>
                 <title>{props.title.clone()}</title>
-                <meta property="og:title" content={props.title.clone()} />
+                <meta property="og:title" content={props.title.clone()}/>
+                <meta property="og:site_name" content={props.gallery.config.title.clone()}/>
                 if let Some(description) = props.description.clone() {
                     <meta name="description" content={description.clone()}/>
                     <meta property="og:description" content={description}/>
