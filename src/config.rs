@@ -38,6 +38,12 @@ pub struct GalleryConfig {
     pub image_ai_model: String,
     #[serde(default = "default_ai_description_system_prompt")]
     pub ai_description_system_prompt: String,
+    #[serde(default = "default_items_per_page")]
+    pub items_per_page: usize,
+}
+
+fn default_items_per_page() -> usize {
+    30
 }
 
 fn default_input() -> String {
@@ -149,8 +155,17 @@ impl GalleryConfig {
         )
     }
 
-    pub fn category_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
-        let base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
+    pub fn category_html<const PUBLIC: bool>(
+        &self,
+        category: &CategoryPath,
+        name: &str,
+        page: usize,
+    ) -> String {
+        let mut base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
+        if page != 0 {
+            use std::fmt::Write;
+            write!(base, "page/{}/", page + 1).unwrap();
+        }
         if PUBLIC {
             base
         } else {
@@ -181,8 +196,14 @@ impl GalleryConfig {
         }
     }
 
-    pub fn index_html<const PUBLIC: bool>(&self) -> String {
-        if PUBLIC { "/" } else { "/index.html" }.to_owned()
+    pub fn index_html<const PUBLIC: bool>(&self, page: usize) -> String {
+        let base = if page == 0 {
+            "/".to_owned()
+        } else {
+            format!("/page/{}/", page + 1)
+        };
+        let suffix = if PUBLIC { "" } else { "index.html" }.to_owned();
+        format!("{base}{suffix}")
     }
 }
 
@@ -242,6 +263,8 @@ pub struct CategoryConfig {
     pub description: Option<String>,
     #[serde(default)]
     pub ai_description_hint: Option<String>,
+    #[serde(default = "default_items_per_page")]
+    pub items_per_page: usize,
 }
 
 impl Default for CategoryConfig {

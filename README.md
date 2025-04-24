@@ -60,6 +60,7 @@ thumbnail_resolution = 100
 thumbnail_format = "jpg"
 image_ai_model = "gemma3"
 # ai_description_system_prompt = "override system prompt"
+items_per_page = 30
 ```
 
 ### Category config
@@ -75,6 +76,7 @@ order = 0
 thumbnail = "Photo1"
 # correct AI hallucinations without needing to manually overwrite everything.
 ai_description_hint = "all photos have dirt not sand"
+items_per_page = 30
 ```
 
 ### Photo config
@@ -129,7 +131,7 @@ order = 0
 - [x] Output HTML, Sitemap, PWA, structured data, and Open Graph metadata
 - [x] AI photo descriptions
 - [x] Basic image adjustment (exposure)
-- [ ] Pagination
+- [x] Pagination
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
 - [ ] Support for themes

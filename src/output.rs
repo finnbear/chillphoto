@@ -223,30 +223,45 @@ impl Gallery {
                 }
                 Item::Category(category) => {
                     let category_path = path.push(category.slug());
-                    let page_items = page_items.clone();
-                    ret.insert(
-                        config.category_html::<false>(&path, &category.slug()),
-                        LazyLock::new(Box::new(move || {
-                            render_html(AppProps {
-                                canonical: config.category_html::<true>(&path, &category.slug()),
-                                gallery: self,
-                                title: category.name.clone().into(),
-                                description: category.config.description.clone().map(|d| d.into()),
-                                head: Default::default(),
-                                body: html!{<>
-                                    {render_items(self, &category_path, &category.children)}
-                                    if let Some(text) = &category.text {
-                                        {rich_text_html(text)}
-                                    }
-                                </>},
-                                sidebar: Html::default(),
-                                pages: page_items,
-                                path: category_path.clone(),
-                                relative: None,
-                                og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, &preview.name), preview.preview_dimensions(&self.config)))
-                            })
-                        })),
-                    );
+                    for chunk in paginate(&category.children, category.config.items_per_page) {
+                        let path = path.clone();
+                        let category_path = category_path.clone();
+                        let page_items = page_items.clone();
+                        let mut title = category.name.clone();
+                        if chunk.index != 0 {
+                            write!(title, " (page {})", chunk.index + 1).unwrap();
+                        }
+                        ret.insert(
+                            config.category_html::<false>(&path, &category.slug(), chunk.index),
+                            LazyLock::new(Box::new(move || {
+                                render_html(AppProps {
+                                    canonical: config.category_html::<true>(&path, &category.slug(), chunk.index),
+                                    gallery: self,
+                                    title: title.into(),
+                                    description: category.config.description.clone().map(|d| d.into()),
+                                    head: Default::default(),
+                                    body: html!{<>
+                                        {render_items(self, &category_path, chunk.items)}
+                                        if let Some(text) = &category.text {
+                                            {rich_text_html(text)}
+                                        }
+                                    </>},
+                                    sidebar: Html::default(),
+                                    pages: page_items,
+                                    path: category_path.clone(),
+                                    relative: (chunk.count != 1).then_some(RelativeNavigation {
+                                        index: chunk.index,
+                                        count: chunk.count,
+                                        previous: (chunk.index != 0)
+                                            .then(|| config.category_html::<true>(&path, &category.slug(), chunk.index - 1)),
+                                        next: (chunk.index != chunk.count - 1)
+                                            .then(|| config.category_html::<true>(&path, &category.slug(), chunk.index + 1)),
+                                    }),
+                                    og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, &preview.name), preview.preview_dimensions(&self.config)))
+                                })
+                            })),
+                        );
+                    };
                 }
                 Item::Page(page) => {
                     let page_items = page_items.clone();
@@ -302,54 +317,77 @@ impl Gallery {
             );
         }
 
-        ret.insert(
-            self.config.index_html::<false>(),
-            LazyLock::new(Box::new(move || {
-                /// https://schema.org/WebSite
-                #[derive(Serialize)]
-                struct WebSiteStructuredData {
-                    #[serde(rename = "@type")]
-                    _type: &'static str,
-                    #[serde(skip_serializing_if = "Option::is_none")]
-                    url: Option<String>,
-                    name: String,
-                    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
-                    description: Option<String>,
-                    #[serde(rename = "copyrightHolder", skip_serializing_if = "Option::is_none")]
-                    copyright_holder: Option<PersonStructuredData>,
-                }
+        for chunk in paginate(&self.children, self.config.items_per_page) {
+            let page_items = page_items.clone();
+            let root_og_image = root_og_image.clone();
+            ret.insert(
+                self.config.index_html::<false>(chunk.index),
+                LazyLock::new(Box::new(move || {
+                    /// https://schema.org/WebSite
+                    #[derive(Serialize)]
+                    struct WebSiteStructuredData {
+                        #[serde(rename = "@type")]
+                        _type: &'static str,
+                        #[serde(skip_serializing_if = "Option::is_none")]
+                        url: Option<String>,
+                        name: String,
+                        #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+                        description: Option<String>,
+                        #[serde(
+                            rename = "copyrightHolder",
+                            skip_serializing_if = "Option::is_none"
+                        )]
+                        copyright_holder: Option<PersonStructuredData>,
+                    }
 
-                let website_structured_data = write_structured_data(WebSiteStructuredData {
-                    _type: "WebSite",
-                    url: self.config.root_url.clone(),
-                    name: self.config.title.clone(),
-                    description: self.config.description.clone(),
-                    copyright_holder: self.config.author.clone().map(|name| PersonStructuredData {
-                        _type: "Person",
-                        name,
-                    }),
-                });
+                    let website_structured_data = (chunk.index == 0).then(|| {
+                        write_structured_data(WebSiteStructuredData {
+                            _type: "WebSite",
+                            url: self.config.root_url.clone(),
+                            name: self.config.title.clone(),
+                            description: self.config.description.clone(),
+                            copyright_holder: self.config.author.clone().map(|name| {
+                                PersonStructuredData {
+                                    _type: "Person",
+                                    name,
+                                }
+                            }),
+                        })
+                    });
 
-                render_html(AppProps {
-                    canonical: self.config.index_html::<true>(),
-                    gallery: self,
-                    title: self.config.title.clone().into(),
-                    description: self.config.description.clone().map(|d| d.into()),
-                    head: website_structured_data,
-                    body: html! {<>
-                        {render_items(self, &CategoryPath::ROOT, &self.children)}
-                        if let Some(text) = &self.home_text {
-                            {rich_text_html(text)}
-                        }
-                    </>},
-                    sidebar: Html::default(),
-                    pages: page_items,
-                    path: CategoryPath::ROOT,
-                    relative: None,
-                    og_image: root_og_image.clone(),
-                })
-            })),
-        );
+                    let mut title = self.config.title.clone();
+                    if chunk.index != 0 {
+                        write!(title, " (page {})", chunk.index + 1).unwrap();
+                    }
+
+                    render_html(AppProps {
+                        canonical: self.config.index_html::<true>(chunk.index),
+                        gallery: self,
+                        title: title.into(),
+                        description: self.config.description.clone().map(|d| d.into()),
+                        head: website_structured_data.unwrap_or_default(),
+                        body: html! {<>
+                            {render_items(self, &CategoryPath::ROOT, chunk.items)}
+                            if let Some(text) = &self.home_text {
+                                {rich_text_html(text)}
+                            }
+                        </>},
+                        sidebar: Html::default(),
+                        pages: page_items,
+                        path: CategoryPath::ROOT,
+                        relative: (chunk.count != 1).then_some(RelativeNavigation {
+                            index: chunk.index,
+                            count: chunk.count,
+                            previous: (chunk.index != 0)
+                                .then(|| self.config.index_html::<true>(chunk.index - 1)),
+                            next: (chunk.index != chunk.count - 1)
+                                .then(|| self.config.index_html::<true>(chunk.index + 1)),
+                        }),
+                        og_image: root_og_image.clone(),
+                    })
+                })),
+            );
+        }
 
         if let Some(root_url) = &self.config.root_url {
             for page in ret
@@ -403,6 +441,28 @@ impl Gallery {
     }
 }
 
+struct PageChunk<'a> {
+    items: &'a [Item],
+    index: usize,
+    #[allow(unused)]
+    count: usize,
+}
+
+fn paginate(items: &[Item], items_per_page: usize) -> impl Iterator<Item = PageChunk<'_>> + '_ {
+    let items = &items[0..items
+        .iter()
+        .rposition(|i| i.photo().is_some() || i.category().is_some())
+        .unwrap()
+        + 1];
+    let chunks = items.chunks(items_per_page);
+    let count = chunks.len();
+    chunks.enumerate().map(move |(index, items)| PageChunk {
+        items,
+        index,
+        count,
+    })
+}
+
 #[derive(PartialEq)]
 pub struct RelativeNavigation {
     index: usize,
@@ -448,7 +508,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                         Some(html!{
                             <a
                                 class="thumbnail_container category_item"
-                                href={gallery.config.category_html::<true>(&category_path, &category.slug())}
+                                href={gallery.config.category_html::<true>(&category_path, &category.slug(), 0)}
                             >
                                 <img
                                     class="thumbnail"
@@ -778,11 +838,12 @@ pub fn app(props: AppProps<'_>) -> Html {
                         .to_owned(),
                     position: i + 1,
                     item: Some(if path.is_root() {
-                        props.gallery.config.index_html::<true>()
+                        props.gallery.config.index_html::<true>(0)
                     } else {
                         props.gallery.config.category_html::<true>(
                             &path.pop().unwrap(),
                             path.last_segment().unwrap(),
+                            0,
                         )
                     }),
                 }
