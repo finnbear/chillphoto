@@ -392,9 +392,23 @@ impl Gallery {
         if let Some(root_url) = &self.config.root_url {
             for page in ret
                 .keys()
-                .filter(|k| k.ends_with('/') || k.ends_with(".html"))
+                .filter_map(|k| {
+                    let mut k = k.as_str();
+                    let q = if let Some((p, q)) = k.split_once('?') {
+                        k = p;
+                        format!("?{q}")
+                    } else {
+                        "".to_owned()
+                    };
+
+                    if k.ends_with('/') || k.ends_with(".html") {
+                        Some(format!("{}{}", k.trim_end_matches("index.html"), q))
+                    } else {
+                        None
+                    }
+                })
                 .map(|s| {
-                    Url::builder(format!("{root_url}{}", s.trim_end_matches("index.html")))
+                    Url::builder(format!("{root_url}{}", s))
                         .change_frequency(ChangeFrequency::Weekly)
                         .build()
                         .unwrap()
