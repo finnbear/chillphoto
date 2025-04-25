@@ -76,6 +76,9 @@ order = 0
 thumbnail = "Photo1"
 # correct AI hallucinations without needing to manually overwrite everything.
 ai_description_hint = "all photos have dirt not sand"
+# path or query string page number
+pagination_flavor = "path"
+# categories/photos per page
 items_per_page = 30
 ```
 

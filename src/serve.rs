@@ -118,6 +118,10 @@ pub fn serve(
                 if path.ends_with('/') {
                     path.push_str("index.html")
                 }
+                if let Some(query) = request.uri().query() {
+                    use std::fmt::Write;
+                    write!(path, "?{query}").unwrap();
+                }
 
                 let response = if let Some(file) = output.get(&path) {
                     http::Response::builder()

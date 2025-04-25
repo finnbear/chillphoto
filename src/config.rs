@@ -4,7 +4,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GalleryConfig {
     #[serde(default = "default_input")]
     pub input: String,
@@ -38,8 +38,18 @@ pub struct GalleryConfig {
     pub image_ai_model: String,
     #[serde(default = "default_ai_description_system_prompt")]
     pub ai_description_system_prompt: String,
+    #[serde(default)]
+    pub pagination_flavor: PaginationFlavor,
     #[serde(default = "default_items_per_page")]
     pub items_per_page: usize,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PaginationFlavor {
+    #[default]
+    Path,
+    Query,
 }
 
 fn default_items_per_page() -> usize {
@@ -161,16 +171,8 @@ impl GalleryConfig {
         name: &str,
         page: usize,
     ) -> String {
-        let mut base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
-        if page != 0 {
-            use std::fmt::Write;
-            write!(base, "page/{}/", page + 1).unwrap();
-        }
-        if PUBLIC {
-            base
-        } else {
-            format!("{base}index.html",)
-        }
+        let base = self.variation::<PUBLIC>(category, name, "");
+        format!("{base}{}", self.index_html::<PUBLIC>(page))
     }
 
     pub fn favicon<const PUBLIC: bool>(&self) -> String {
@@ -197,13 +199,18 @@ impl GalleryConfig {
     }
 
     pub fn index_html<const PUBLIC: bool>(&self, page: usize) -> String {
-        let base = if page == 0 {
+        let base = if page == 0 || matches!(self.pagination_flavor, PaginationFlavor::Query) {
             "/".to_owned()
         } else {
             format!("/page/{}/", page + 1)
         };
-        let suffix = if PUBLIC { "" } else { "index.html" }.to_owned();
-        format!("{base}{suffix}")
+        let filename = if PUBLIC { "" } else { "index.html" }.to_owned();
+        let suffix = if page > 0 && matches!(self.pagination_flavor, PaginationFlavor::Query) {
+            format!("?page={}", page + 1)
+        } else {
+            "".to_owned()
+        };
+        format!("{base}{filename}{suffix}")
     }
 }
 
