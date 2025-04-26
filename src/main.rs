@@ -4,21 +4,21 @@ use clap::{Parser, Subcommand};
 use config::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
 use exif::ExifData;
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
-use image_ai::{image_ai, ImageAiPrompt};
 use indicatif::{ProgressBar, ProgressStyle};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use std::fmt::Write as _;
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use toml_edit::DocumentMut;
-use util::{checksum, remove_dir_contents};
+use util::remove_dir_contents;
 use wax::Glob;
+
+use crate::image_ai::init_image_ai;
 
 mod category_path;
 mod config;
@@ -40,33 +40,44 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Create default top-level configuration file.
-    Init,
+    /// Create configuration files, starting with
+    /// the top-level config file.
+    Init {
+        /// Generate config files for all photos.
+        #[arg(long)]
+        photos: bool,
+        /// Use an AI model (via `ollama`) to generate missing photo descriptions.
+        #[arg(long)]
+        image_ai: bool,
+    },
     /// Serve gallery preview.
     Serve,
     /// Build static gallery website.
     Build,
-    /// Use an AI model (via `ollama`) to generate missing photo descriptions.
-    ImageAi,
 }
 
 fn main() {
     let start = Instant::now();
-
     let args = Args::parse();
 
-    if matches!(args.command, Command::Init) {
-        let config = toml::from_str::<GalleryConfig>("").unwrap();
-        let string = toml::to_string(&config).unwrap();
-        let mut file = fs::OpenOptions::new()
+    if matches!(args.command, Command::Init { .. }) {
+        if let Some(mut file) = match fs::OpenOptions::new()
             .create_new(true)
             .write(true)
             .open("./chillphoto.toml")
-            .unwrap();
-        file.write_all(string.as_bytes()).unwrap();
-        file.flush().unwrap();
-        file.sync_all().unwrap();
-        return;
+        {
+            Ok(file) => Some(file),
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => None,
+            Err(e) => {
+                panic!("{}", e);
+            }
+        } {
+            let config = toml::from_str::<GalleryConfig>("").unwrap();
+            let string = toml::to_string(&config).unwrap();
+            file.write_all(string.as_bytes()).unwrap();
+            file.flush().unwrap();
+            file.sync_all().unwrap();
+        }
     }
 
     let config_text =
@@ -342,66 +353,12 @@ fn main() {
         start.elapsed().as_secs_f32()
     );
 
-    if matches!(args.command, Command::ImageAi) {
+    if let Command::Init { photos, image_ai } = &args.command {
         gallery.visit_items(|path, item| {
             if let Some(photo) = item.photo() {
-                let mut prompt = String::new();
-                if path.is_root() {
-                    writeln!(
-                        prompt,
-                        "The photo is in the gallery: {}.",
-                        gallery.config.title
-                    )
-                    .unwrap();
-                    if let Some(description) = &gallery.config.description {
-                        writeln!(prompt, "The gallery description is: {description}.",).unwrap();
-                    }
-                } else {
-                    let category = gallery.category(path).unwrap();
-                    writeln!(prompt, "The photo is in the category: {}.", category.name).unwrap();
-                    if let Some(description) = &category.config.description {
-                        writeln!(prompt, "The category description is: {description}.",).unwrap();
-                    }
-                    if let Some(hint) = &category.config.ai_description_hint {
-                        writeln!(
-                            prompt,
-                            "A hint for the entire category been provided: {hint}."
-                        )
-                        .unwrap();
-                    }
+                if !*photos && !*image_ai {
+                    return;
                 }
-                if let Some(hint) = &photo.config.ai_description_hint {
-                    writeln!(prompt, "A hint has been provided: {hint}.").unwrap();
-                }
-
-                writeln!(prompt, "Describe the photo.").unwrap();
-
-                let prompt = ImageAiPrompt {
-                    prompt: &prompt,
-                    photo,
-                    config: &gallery.config,
-                };
-
-                if let Some(description) = photo.config.description.as_ref() {
-                    if photo.config.ai_description_output_checksum
-                        != Some(checksum(description.as_bytes()))
-                    {
-                        println!("keeping manual description for {}", photo.name);
-                        return;
-                    }
-                }
-
-                let input_checksum = prompt.checksum();
-                if let Some(sum) = &photo.config.ai_description_input_checksum {
-                    if input_checksum == *sum {
-                        println!("keeping existing ai description for {}", photo.name);
-                        return;
-                    } else {
-                        println!("regenerating ai description for {}", photo.name);
-                    }
-                }
-
-                let summary = image_ai(prompt);
 
                 let mut config_path = root.clone();
                 for path in path.iter_paths().skip(1) {
@@ -419,16 +376,15 @@ fn main() {
                 let mut existing = String::new();
                 file.read_to_string(&mut existing).unwrap();
                 let mut doc = existing.parse::<DocumentMut>().unwrap();
-                doc["description"] = toml_edit::value(summary.clone());
-                doc["ai_description_input_checksum"] = toml_edit::value(input_checksum);
-                doc["ai_description_output_checksum"] =
-                    toml_edit::value(checksum(&summary.as_bytes()));
+
+                if *image_ai {
+                    init_image_ai(&gallery, &path, photo, &mut doc);
+                }
+
                 file.seek(SeekFrom::Start(0)).unwrap();
                 file.set_len(0).unwrap();
                 file.write_all(doc.to_string().as_bytes()).unwrap();
                 file.sync_data().unwrap();
-
-                println!("summarized {}: {summary}", photo.name);
             }
         });
         return;

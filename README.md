@@ -15,7 +15,7 @@ chillphoto serve    # preview the gallery
 chillphoto build    # generate the gallery
 
 ollama pull gemma3  # install dependency
-chillphoto image-ai # AI-generate photo descriptions based on thumbnails
+chillphoto init --image-ai # AI-generate photo descriptions based on thumbnails
 ```
 
 ### Directory Structure
@@ -135,6 +135,7 @@ order = 0
 - [x] AI photo descriptions
 - [x] Basic image adjustment (exposure)
 - [x] Pagination
+- [ ] 404 page
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
 - [ ] Support for themes

@@ -1,4 +1,7 @@
-use crate::{config::GalleryConfig, photo::Photo, util::checksum};
+use crate::{
+    category_path::CategoryPath, config::GalleryConfig, gallery::Gallery, photo::Photo,
+    util::checksum,
+};
 use base64::Engine;
 use image::ImageFormat;
 use ollama_rs::{
@@ -9,8 +12,74 @@ use ollama_rs::{
     },
     Ollama,
 };
+use std::fmt::Write as _;
 use std::io::Cursor;
 use tokio::runtime::Builder;
+use toml_edit::DocumentMut;
+
+pub fn init_image_ai(gallery: &Gallery, path: &CategoryPath, photo: &Photo, doc: &mut DocumentMut) {
+    let mut prompt = String::new();
+    if path.is_root() {
+        writeln!(
+            prompt,
+            "The photo is in the gallery: {}.",
+            gallery.config.title
+        )
+        .unwrap();
+        if let Some(description) = &gallery.config.description {
+            writeln!(prompt, "The gallery description is: {description}.",).unwrap();
+        }
+    } else {
+        let category = gallery.category(path).unwrap();
+        writeln!(prompt, "The photo is in the category: {}.", category.name).unwrap();
+        if let Some(description) = &category.config.description {
+            writeln!(prompt, "The category description is: {description}.",).unwrap();
+        }
+        if let Some(hint) = &category.config.ai_description_hint {
+            writeln!(
+                prompt,
+                "A hint for the entire category been provided: {hint}."
+            )
+            .unwrap();
+        }
+    }
+    if let Some(hint) = &photo.config.ai_description_hint {
+        writeln!(prompt, "A hint has been provided: {hint}.").unwrap();
+    }
+
+    writeln!(prompt, "Describe the photo.").unwrap();
+
+    let prompt = ImageAiPrompt {
+        prompt: &prompt,
+        photo,
+        config: &gallery.config,
+    };
+
+    if let Some(description) = photo.config.description.as_ref() {
+        if photo.config.ai_description_output_checksum != Some(checksum(description.as_bytes())) {
+            println!("keeping manual description for {}", photo.name);
+            return;
+        }
+    }
+
+    let input_checksum = prompt.checksum();
+    if let Some(sum) = &photo.config.ai_description_input_checksum {
+        if input_checksum == *sum {
+            println!("keeping existing ai description for {}", photo.name);
+            return;
+        } else {
+            println!("regenerating ai description for {}", photo.name);
+        }
+    }
+
+    let summary = image_ai(prompt);
+
+    doc["description"] = toml_edit::value(summary.clone());
+    doc["ai_description_input_checksum"] = toml_edit::value(input_checksum);
+    doc["ai_description_output_checksum"] = toml_edit::value(checksum(&summary.as_bytes()));
+
+    println!("summarized {}: {summary}", photo.name);
+}
 
 pub struct ImageAiPrompt<'a> {
     pub prompt: &'a str,
