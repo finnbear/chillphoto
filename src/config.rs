@@ -285,6 +285,8 @@ pub struct PageConfig {
     #[serde(default)]
     pub order: i64,
     pub description: Option<String>,
+    #[serde(default)]
+    pub unlisted: bool,
 }
 
 impl Default for PageConfig {

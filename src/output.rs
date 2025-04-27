@@ -30,6 +30,7 @@ impl Gallery {
             .children
             .iter()
             .filter_map(|i| i.page())
+            .filter(|p| !p.config.unlisted)
             .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
             .collect::<Vec<_>>();
 

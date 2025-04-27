@@ -122,6 +122,8 @@ description = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0
+# to avoid it appearing in the sidebar
+unlisted = true
 ```
 
 ## Features
