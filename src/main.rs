@@ -1,3 +1,4 @@
+use crate::image_ai::init_image_ai;
 use category_path::CategoryPath;
 use chrono::NaiveDateTime;
 use clap::{Parser, Subcommand};
@@ -8,6 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
+use static_file::StaticFile;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
@@ -18,8 +20,6 @@ use toml_edit::DocumentMut;
 use util::remove_dir_contents;
 use wax::Glob;
 
-use crate::image_ai::init_image_ai;
-
 mod category_path;
 mod config;
 mod exif;
@@ -29,6 +29,7 @@ mod image_ai;
 mod output;
 mod photo;
 mod serve;
+mod static_file;
 mod util;
 
 #[derive(Parser)]
@@ -116,15 +117,16 @@ fn main() {
             config,
             head_html: None,
             home_text: None,
+            static_files: Vec::new(),
         },
         item_configs: HashMap::new(),
     });
 
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
-        let name = entry.matched().complete().to_owned();
+        let entire_path = entry.matched().complete().to_owned();
         let (category_names, categories, name) =
-            if let Some((categories, name)) = name.rsplit_once('/') {
+            if let Some((categories, name)) = entire_path.rsplit_once('/') {
                 let category_names = categories
                     .split('/')
                     .map(|s| s.to_owned())
@@ -138,8 +140,17 @@ fn main() {
                 );
                 (category_names, path, name)
             } else {
-                (Vec::new(), CategoryPath::ROOT, name.as_str())
+                (Vec::new(), CategoryPath::ROOT, entire_path.as_str())
             };
+
+        if !category_names.is_empty() && category_names[0] == "static" {
+            let mut gallery = gallery.lock().unwrap();
+            gallery.gallery.static_files.push(StaticFile {
+                path: format!("/{entire_path}"),
+                contents: fs::read(entry.path()).unwrap(),
+            });
+            return;
+        }
 
         let name_no_extension = name.rsplit_once('.').unwrap().0.to_owned();
 

@@ -153,8 +153,12 @@ pub fn serve(
 
                 let body: &[u8] = response.body().as_ref();
                 let content_length = body.len();
-                headers.push_str(&format!("Content-Length: {}\r\n\r\n", content_length));
-
+                headers.push_str(&format!("Content-Length: {}\r\n", content_length));
+                if path.ends_with(".svg") {
+                    // Help Chrome
+                    headers.push_str("Content-Type: image/svg+xml\r\n");
+                }
+                headers.push_str("\r\n");
                 if stream.write_all(status_line.as_bytes()).is_err() {
                     return;
                 }

@@ -4,6 +4,7 @@ use crate::{
     category_path::CategoryPath,
     config::{CategoryConfig, GalleryConfig, PageConfig},
     photo::Photo,
+    static_file::StaticFile,
 };
 use chrono::NaiveDate;
 use image::RgbImage;
@@ -15,6 +16,7 @@ pub struct Gallery {
     pub config: GalleryConfig,
     pub head_html: Option<String>,
     pub home_text: Option<RichText>,
+    pub static_files: Vec<StaticFile>,
 }
 
 impl Gallery {

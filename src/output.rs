@@ -452,6 +452,13 @@ impl Gallery {
             })),
         );
 
+        for file in &self.static_files {
+            ret.insert(
+                file.path.clone(),
+                LazyLock::new(Box::new(move || file.contents.clone())),
+            );
+        }
+
         ret
     }
 }

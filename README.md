@@ -26,6 +26,8 @@ chillphoto init --image-ai # AI-generate photo descriptions based on thumbnails
   favicon.png               # favicon
   head.html                 # HTML to include in <head>
   home.{txt,md,html}        # gallery homepage caption
+  /static                   # custom static files
+    button.svg              # decorative image for some page
   About.{txt,md,html}       # page, linked on sidebar
   About.toml                # page config
   Category 2.{txt,md,html}  # category caption
