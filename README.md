@@ -62,6 +62,7 @@ thumbnail_resolution = 100
 thumbnail_format = "jpg"
 image_ai_model = "gemma3"
 # ai_description_system_prompt = "override system prompt"
+ai_description_hint = "do not mention text in photos"
 items_per_page = 30
 ```
 

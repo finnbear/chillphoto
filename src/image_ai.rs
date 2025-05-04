@@ -10,6 +10,7 @@ use ollama_rs::{
         images::Image,
         parameters::{KeepAlive, TimeUnit},
     },
+    models::ModelOptions,
     Ollama,
 };
 use std::fmt::Write as _;
@@ -42,6 +43,13 @@ pub fn init_image_ai(gallery: &Gallery, path: &CategoryPath, photo: &Photo, doc:
             )
             .unwrap();
         }
+    }
+    if let Some(hint) = &gallery.config.ai_description_hint {
+        writeln!(
+            prompt,
+            "A hint for the entire gallery been provided: {hint}."
+        )
+        .unwrap();
     }
     if let Some(hint) = &photo.config.ai_description_hint {
         writeln!(prompt, "A hint has been provided: {hint}.").unwrap();
@@ -121,6 +129,12 @@ pub fn image_ai(prompt: ImageAiPrompt) -> String {
                 time: 5,
                 unit: TimeUnit::Seconds,
             })
+            .options(
+                ModelOptions::default()
+                    .temperature(0.25)
+                    .top_k(6)
+                    .top_p(0.4),
+            )
             .system(&prompt.config.ai_description_system_prompt);
 
         let response = match send_request(request).await {

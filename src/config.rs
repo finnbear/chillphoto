@@ -39,6 +39,8 @@ pub struct GalleryConfig {
     #[serde(default = "default_ai_description_system_prompt")]
     pub ai_description_system_prompt: String,
     #[serde(default)]
+    pub ai_description_hint: Option<String>,
+    #[serde(default)]
     pub pagination_flavor: PaginationFlavor,
     #[serde(default = "default_items_per_page")]
     pub items_per_page: usize,
