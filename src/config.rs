@@ -34,6 +34,9 @@ pub struct GalleryConfig {
     pub thumbnail_format: OutputFormat,
     #[serde(default = "default_thumbnail_resolution")]
     pub thumbnail_resolution: u32,
+    #[serde(default = "default_image_ai_api_base_url")]
+    pub image_ai_api_base_url: String,
+    pub image_ai_api_key: Option<String>,
     #[serde(default = "default_image_ai_model")]
     pub image_ai_model: String,
     #[serde(default = "default_ai_description_system_prompt")]
@@ -98,12 +101,16 @@ fn default_output() -> String {
     String::from("./output")
 }
 
+fn default_image_ai_api_base_url() -> String {
+    async_openai::config::OPENAI_API_BASE.to_owned()
+}
+
 fn default_image_ai_model() -> String {
     String::from("gemma3")
 }
 
 fn default_ai_description_system_prompt() -> String {
-    String::from("You are a photo summarizer tasked with generating descriptions for photos on an gallery website, with an emphasis on accessibility. Visually-impaired people will rely on your descriptions, so make them accurate and interesting. You never explicitly speculate, mention a lack of text, or use more than 2 sentences.")
+    String::from("You are a photo summarizer tasked with generating descriptions for photos on an gallery website, with an emphasis on accessibility. Visually-impaired people will rely on your descriptions, so make them accurate and interesting. You never explicitly speculate, mention a lack of text, or use more than 2 sentences. You only output the requested description and nothing else.")
 }
 
 impl GalleryConfig {

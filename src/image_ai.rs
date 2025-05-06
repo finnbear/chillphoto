@@ -2,6 +2,13 @@ use crate::{
     category_path::CategoryPath, config::GalleryConfig, gallery::Gallery, photo::Photo,
     util::checksum,
 };
+use async_openai::types::{
+    ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
+    ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestSystemMessageContent,
+    ChatCompletionRequestUserMessageArgs, ChatCompletionRequestUserMessageContent,
+    ChatCompletionRequestUserMessageContentPart, CreateChatCompletionRequestArgs, ImageDetail,
+    ImageUrl,
+};
 use base64::Engine;
 use image::ImageFormat;
 use ollama_rs::{
@@ -80,7 +87,11 @@ pub fn init_image_ai(gallery: &Gallery, path: &CategoryPath, photo: &Photo, doc:
         }
     }
 
-    let summary = image_ai(prompt);
+    let summary = image_ai(
+        prompt,
+        &gallery.config.image_ai_api_base_url,
+        gallery.config.image_ai_api_key.as_deref(),
+    );
 
     doc["description"] = toml_edit::value(summary.clone());
     doc["ai_description_input_checksum"] = toml_edit::value(input_checksum);
@@ -108,7 +119,7 @@ impl<'a> ImageAiPrompt<'a> {
     }
 }
 
-pub fn image_ai(prompt: ImageAiPrompt) -> String {
+pub fn image_ai(prompt: ImageAiPrompt, base_url: &str, api_key: Option<&str>) -> String {
     let image = prompt.photo.thumbnail(&prompt.config);
     let jpeg = Vec::<u8>::new();
     let mut cursor = Cursor::new(jpeg);
@@ -120,31 +131,91 @@ pub fn image_ai(prompt: ImageAiPrompt) -> String {
         .enable_time()
         .build()
         .unwrap();
+
+    const TEMPERATURE: f32 = 0.25;
+
     rt.block_on(async {
-        let image = Image::from_base64(&base64_image);
+        if let Some(api_key) = api_key {
+            let client = async_openai::Client::with_config(
+                async_openai::config::OpenAIConfig::new()
+                    .with_api_base(base_url)
+                    .with_api_key(api_key),
+            );
+            client
+                .chat()
+                .create(
+                    CreateChatCompletionRequestArgs::default()
+                        .model(&prompt.config.image_ai_model)
+                        .temperature(TEMPERATURE)
+                        .messages([
+                            ChatCompletionRequestSystemMessageArgs::default()
+                                .content(ChatCompletionRequestSystemMessageContent::Text(
+                                    prompt.config.ai_description_system_prompt.clone(),
+                                ))
+                                .build()
+                                .unwrap()
+                                .into(),
+                            ChatCompletionRequestUserMessageArgs::default()
+                                .content(ChatCompletionRequestUserMessageContent::Array(vec![
+                                    ChatCompletionRequestUserMessageContentPart::Text(
+                                        ChatCompletionRequestMessageContentPartText {
+                                            text: prompt.prompt.to_owned(),
+                                        },
+                                    ),
+                                    ChatCompletionRequestUserMessageContentPart::ImageUrl(
+                                        ChatCompletionRequestMessageContentPartImage {
+                                            image_url: ImageUrl {
+                                                url: format!(
+                                                    "data:image/jpeg;base64,{base64_image}"
+                                                ),
+                                                detail: Some(ImageDetail::High),
+                                            },
+                                        },
+                                    ),
+                                ]))
+                                .build()
+                                .unwrap()
+                                .into(),
+                        ])
+                        .build()
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+                .choices
+                .remove(0)
+                .message
+                .content
+                .unwrap()
+                .trim()
+                .to_owned()
+        } else {
+            let image = Image::from_base64(&base64_image);
 
-        let request = GenerationRequest::new(prompt.config.image_ai_model.clone(), prompt.prompt)
-            .add_image(image)
-            .keep_alive(KeepAlive::Until {
-                time: 5,
-                unit: TimeUnit::Seconds,
-            })
-            .options(
-                ModelOptions::default()
-                    .temperature(0.25)
-                    .top_k(6)
-                    .top_p(0.4),
-            )
-            .system(&prompt.config.ai_description_system_prompt);
+            let request =
+                GenerationRequest::new(prompt.config.image_ai_model.clone(), prompt.prompt)
+                    .add_image(image)
+                    .keep_alive(KeepAlive::Until {
+                        time: 5,
+                        unit: TimeUnit::Seconds,
+                    })
+                    .options(
+                        ModelOptions::default()
+                            .temperature(TEMPERATURE)
+                            .top_k(6)
+                            .top_p(0.4),
+                    )
+                    .system(&prompt.config.ai_description_system_prompt);
 
-        let response = match send_request(request).await {
-            Ok(r) => r,
-            Err(e) => {
-                panic!("Failed to get response: {}", e);
-            }
-        };
+            let response = match send_request(request).await {
+                Ok(r) => r,
+                Err(e) => {
+                    panic!("Failed to get response: {}", e);
+                }
+            };
 
-        response.response.trim().to_owned()
+            response.response.trim().to_owned()
+        }
     })
 }
 

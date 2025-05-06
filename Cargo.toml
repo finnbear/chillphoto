@@ -8,6 +8,7 @@ repository = "https://github.com/finnbear/chillphoto/"
 description = "Static photo gallery website generator"
 
 [dependencies]
+async-openai = "0.28.1"
 base64 = "0.22.1"
 chrono = "0.4.40"
 clap = { version = "4.5.34", features = ["derive"] }
