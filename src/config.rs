@@ -94,7 +94,7 @@ fn default_thumbnail_format() -> OutputFormat {
 }
 
 fn default_thumbnail_resolution() -> u32 {
-    100
+    200
 }
 
 fn default_output() -> String {

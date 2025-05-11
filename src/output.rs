@@ -511,11 +511,6 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                     title={photo.name.clone()}
                                     alt={photo.config.description.as_ref().unwrap_or(&photo.name).clone()}
                                     src={thumbnail_url.clone()}
-                                    style={format!(
-                                        "width: {}px; height: {}px;",
-                                        gallery.config.thumbnail_resolution,
-                                        gallery.config.thumbnail_resolution
-                                    )}
                                     class="thumbnail"
                                 />
                                 {write_structured_data(
@@ -534,11 +529,6 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                             >
                                 <img
                                     class="thumbnail"
-                                    style={format!(
-                                        "width: {}px; height: {}px;",
-                                        gallery.config.thumbnail_resolution,
-                                        gallery.config.thumbnail_resolution
-                                    )}
                                     alt={photo.name.clone()}
                                     src={thumbnail_url.clone()}
                                 />
@@ -693,10 +683,11 @@ pub fn app(props: AppProps<'_>) -> Html {
             flex-direction: row;
             gap: 1rem;
             align-items: center;
-            padding: 2.5rem 2rem;
+            padding: 2.25rem 2rem;
         }
 
         #title {
+            font-size: 1.5rem;
             font-weight: normal;
             letter-spacing: 0.1rem;
             flex-grow: 1;
@@ -834,6 +825,11 @@ pub fn app(props: AppProps<'_>) -> Html {
         .preview {
             width: 100%;
             height: auto;
+        }
+
+        .thumbnail {
+            width: 6rem;
+            height: 6rem;
         }
 
         .thumbnail, .preview {
