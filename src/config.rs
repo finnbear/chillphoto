@@ -161,7 +161,7 @@ impl GalleryConfig {
     pub fn preview<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!(
             "{}.{}",
-            self.variation::<PUBLIC>(category, name, "_preview"),
+            self.variation::<PUBLIC>(category, name, "-preview"),
             self.preview_format
         )
     }
@@ -169,7 +169,7 @@ impl GalleryConfig {
     pub fn thumbnail<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         format!(
             "{}.{}",
-            self.variation::<PUBLIC>(category, name, "_thumbnail"),
+            self.variation::<PUBLIC>(category, name, "-thumbnail"),
             self.thumbnail_format
         )
     }
