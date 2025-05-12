@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub struct CategoryPath {
+    /// Each corresponds to a slug with hyphens,
+    /// not the original name with spaces.
     segments: Vec<String>,
 }
 

@@ -50,11 +50,32 @@ impl Gallery {
         self.category(path).map(|c| &c.children)
     }
 
-    pub fn title_or_category_name(&self, path: &CategoryPath) -> &str {
+    pub fn item_name(&self, path: &CategoryPath) -> &str {
         if path.is_root() {
             return self.config.title.as_str();
         }
-        self.category(path).map(|c| c.name.as_str()).unwrap()
+        let parent_path = path.pop().unwrap();
+        let children = self.children(&parent_path).unwrap();
+        for child in children {
+            match child {
+                Item::Category(category) => {
+                    if category.slug() == path.last_segment().unwrap() {
+                        return &category.name;
+                    }
+                }
+                Item::Photo(photo) => {
+                    if photo.output_slug() == path.last_segment().unwrap() {
+                        return photo.output_name();
+                    }
+                }
+                Item::Page(page) => {
+                    if page.slug() == path.last_segment().unwrap() {
+                        return &page.name;
+                    }
+                }
+            }
+        }
+        panic!("{path} not found");
     }
 
     pub fn category(&self, path: &CategoryPath) -> Option<&Category> {
@@ -266,6 +287,12 @@ pub struct Page {
     pub name: String,
     pub text: RichText,
     pub config: PageConfig,
+}
+
+impl Page {
+    pub fn slug(&self) -> String {
+        self.name.replace(' ', "-")
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

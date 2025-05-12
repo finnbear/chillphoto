@@ -23,6 +23,14 @@ pub struct Photo {
 }
 
 impl Photo {
+    pub fn output_name(&self) -> &str {
+        self.config.rename.as_deref().unwrap_or(&self.name)
+    }
+
+    pub fn output_slug(&self) -> String {
+        self.output_name().replace(' ', "-")
+    }
+
     pub fn date_time(&self) -> Option<NaiveDateTime> {
         self.exif.date_time().or_else(|| {
             self.file_date.and_then(|fd| {

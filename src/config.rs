@@ -249,6 +249,7 @@ pub struct PhotoConfig {
     /// Stops of exposure to add.
     #[serde(default)]
     pub exposure: f32,
+    pub rename: Option<String>,
 }
 
 fn default_thumbnail_crop_factor() -> f64 {

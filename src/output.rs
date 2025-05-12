@@ -31,7 +31,7 @@ impl Gallery {
             .iter()
             .filter_map(|i| i.page())
             .filter(|p| !p.config.unlisted)
-            .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.name), p))
+            .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.slug()), p))
             .collect::<Vec<_>>();
 
         let mut ret = HashMap::<
@@ -66,21 +66,21 @@ impl Gallery {
                         num_photos += 1;
                     }
                     let photo_index = photo_index.unwrap();
-                    let photo_path = config.photo::<false>(&path, &photo.name);
+                    let photo_path = config.photo::<false>(&path, &photo.output_slug());
                     ret.insert(
                         photo_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.image(&self.config), &photo_path)
                         })),
                     );
-                    let preview_path = config.preview::<false>(&path, &photo.name);
+                    let preview_path = config.preview::<false>(&path, &photo.output_slug());
                     ret.insert(
                         preview_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.preview(&self.config), &preview_path)
                         })),
                     );
-                    let thumbnail_path = config.thumbnail::<false>(&path, &photo.name);
+                    let thumbnail_path = config.thumbnail::<false>(&path, &photo.output_slug());
                     ret.insert(
                         thumbnail_path.clone(),
                         LazyLock::new(Box::new(move || {
@@ -88,42 +88,42 @@ impl Gallery {
                         })),
                     );
 
-                    let canonical = config.photo_html::<true>(&path, &photo.name);
+                    let canonical = config.photo_html::<true>(&path, &photo.output_slug());
                     if let Some(root) = &self.config.root_url {
                         sitemap.push(UrlBuilder::new(format!("{root}{canonical}"))
                             .change_frequency(ChangeFrequency::Monthly)
                             .images(vec![
-                                Image::new(format!("{root}{}", config.photo::<true>(&path, &photo.name))),
-                                Image::new(format!("{root}{}", config.preview::<true>(&path, &photo.name))),
-                                Image::new(format!("{root}{}", config.thumbnail::<true>(&path, &photo.name))),
+                                Image::new(format!("{root}{}", config.photo::<true>(&path, &photo.output_slug()))),
+                                Image::new(format!("{root}{}", config.preview::<true>(&path, &photo.output_slug()))),
+                                Image::new(format!("{root}{}", config.thumbnail::<true>(&path, &photo.output_slug()))),
                             ]).build().unwrap())
                     }
 
                     let page_items = page_items.clone();
                     ret.insert(
-                        config.photo_html::<false>(&path, &photo.name),
+                        config.photo_html::<false>(&path, &photo.output_slug()),
                         LazyLock::new(Box::new(move || {
-                            let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.name), self.config.photo::<true>(&path, &photo.name), Some(self.config.thumbnail::<true>(&path, &photo.name)), true));
+                            let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.output_slug()), self.config.photo::<true>(&path, &photo.output_slug()), Some(self.config.thumbnail::<true>(&path, &photo.output_slug())), true));
 
-                            let group = self.title_or_category_name(&path);
+                            let group = self.item_name(&path);
 
                             render_html(AppProps {
                                 canonical,
                                 gallery: self,
-                                title: format!("{} | {group}", photo.name.clone()).into(),
+                                title: format!("{} | {group}", photo.output_name()).into(),
                                 description: photo.config.description.clone().map(|s| s.into()),
                                 head: photo_structured_data,
                                 body: html! {<>
                                     <a
                                         class="preview_container"
-                                        href={config.photo::<true>(&path, &photo.name)}
+                                        href={config.photo::<true>(&path, &photo.output_slug())}
                                     >
                                         <img
                                             class="preview"
                                             width={photo.preview_dimensions(config).0.to_string()}
                                             height={photo.preview_dimensions(config).1.to_string()}
-                                            alt={photo.config.description.as_ref().unwrap_or(&photo.name).clone()}
-                                            src={config.preview::<true>(&path, &photo.name)}
+                                            alt={photo.config.description.clone().unwrap_or_else(|| photo.output_name().to_owned())}
+                                            src={config.preview::<true>(&path, &photo.output_slug())}
                                         />
                                     </a>
                                     if let Some(text) = &photo.text {
@@ -204,20 +204,20 @@ impl Gallery {
                                     </div>
                                 },
                                 pages: page_items,
-                                path: path.push(photo.name.clone()).clone(),
+                                path: path.push(photo.output_slug()).clone(),
                                 relative: Some(RelativeNavigation {
                                     index: photo_index,
                                     count: num_photos,
                                     previous: photo_index
                                         .checked_sub(1)
                                         .and_then(|i| photos.get(i))
-                                        .map(|p| config.photo_html::<true>(&path, &p.name)),
+                                        .map(|p| config.photo_html::<true>(&path, &p.output_slug())),
                                     next: photo_index
                                         .checked_add(1)
                                         .and_then(|i| photos.get(i))
-                                        .map(|p| config.photo_html::<true>(&path, &p.name)),
+                                        .map(|p| config.photo_html::<true>(&path, &p.output_slug())),
                                 }),
-                                og_image: Some((self.config.preview::<true>(&path, &photo.name), photo.preview_dimensions(&self.config))),
+                                og_image: Some((self.config.preview::<true>(&path, &photo.output_slug()), photo.preview_dimensions(&self.config))),
                             })
                         })),
                     );
@@ -268,10 +268,10 @@ impl Gallery {
                     let page_items = page_items.clone();
                     let root_thumbnail = root_og_image.clone();
                     ret.insert(
-                        config.page_html::<false>(&path, &page.name),
+                        config.page_html::<false>(&path, &page.slug()),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
-                                canonical: config.page_html::<true>(&path, &page.name),
+                                canonical: config.page_html::<true>(&path, &page.slug()),
                                 gallery: self,
                                 title: page.name.clone().into(),
                                 description: page.config.description.clone().map(|s| s.into()),
@@ -279,7 +279,7 @@ impl Gallery {
                                 body: rich_text_html(&page.text),
                                 sidebar: Html::default(),
                                 pages: page_items.clone(),
-                                path: path.push(page.name.clone()).clone(),
+                                path: path.push(page.slug()),
                                 relative: None,
                                 og_image: root_thumbnail,
                             })
@@ -499,17 +499,17 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
             {items.iter().filter_map(|child| {
                 match child {
                     Item::Photo(photo) => {
-                        let content_url = gallery.config.photo::<true>(&category_path, &photo.name);
-                        let thumbnail_url = gallery.config.thumbnail::<true>(&category_path, &photo.name);
-                        let html_url = gallery.config.photo_html::<true>(&category_path, &photo.name);
+                        let content_url = gallery.config.photo::<true>(&category_path, &photo.output_slug());
+                        let thumbnail_url = gallery.config.thumbnail::<true>(&category_path, &photo.output_slug());
+                        let html_url = gallery.config.photo_html::<true>(&category_path, &photo.output_slug());
                         Some(html!{
                             <a
                                 class="thumbnail_container"
                                 href={html_url.clone()}
                             >
                                 <img
-                                    title={photo.name.clone()}
-                                    alt={photo.config.description.as_ref().unwrap_or(&photo.name).clone()}
+                                    title={photo.output_name().to_owned()}
+                                    alt={photo.config.description.clone().unwrap_or_else(|| photo.output_name().to_owned())}
                                     src={thumbnail_url.clone()}
                                     class="thumbnail"
                                 />
@@ -521,7 +521,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                     }
                     Item::Category(category) => {
                         let (photo_path, photo) = category.thumbnail(category_path)?;
-                        let thumbnail_url = gallery.config.thumbnail::<true>(&photo_path, &photo.name);
+                        let thumbnail_url = gallery.config.thumbnail::<true>(&photo_path, &photo.output_slug());
                         Some(html!{
                             <a
                                 class="thumbnail_container category_item"
@@ -529,7 +529,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                             >
                                 <img
                                     class="thumbnail"
-                                    alt={photo.name.clone()}
+                                    alt={photo.output_name().to_owned()}
                                     src={thumbnail_url.clone()}
                                 />
                                 <div class="category_item_info">
@@ -563,8 +563,8 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                                     photo_structured_data(
                                         gallery,
                                         photo,
-                                        gallery.config.photo_html::<true>(&photo_path, &photo.name),
-                                        gallery.config.photo::<true>(&photo_path, &photo.name),
+                                        gallery.config.photo_html::<true>(&photo_path, &photo.output_slug()),
+                                        gallery.config.photo::<true>(&photo_path, &photo.output_slug()),
                                         Some(thumbnail_url),
                                         false
                                     )
@@ -868,13 +868,11 @@ pub fn app(props: AppProps<'_>) -> Html {
             } else {
                 BreadcrumbListElement {
                     _type: "ListItem",
-                    name: props
-                        .gallery
-                        .category(&path)
-                        .map(|c| c.name.as_str())
-                        .or(path.last_segment())
-                        .unwrap_or("Home")
-                        .to_owned(),
+                    name: if path.is_root() {
+                        "Home".to_owned()
+                    } else {
+                        props.gallery.item_name(&path).to_owned()
+                    },
                     position: i + 1,
                     item: None,
                 }
@@ -1337,7 +1335,7 @@ fn photo_structured_data(
     PhotoStructuredData {
         _type: "ImageObject",
         content_url,
-        name: photo.name.clone(),
+        name: photo.output_name().to_owned(),
         description: photo.config.description.clone(),
         date_created: photo.date_time().map(|d| d.date().to_string()),
         creator: author_person.clone(),
