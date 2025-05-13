@@ -38,6 +38,16 @@ impl Gallery {
             String,
             LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
         >::new();
+        fn ret_insert<'a>(
+            ret: &mut HashMap<
+                String,
+                LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
+            >,
+            path: String,
+            file: LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
+        ) {
+            assert!(ret.insert(path.clone(), file).is_none(), "duplicate {path}");
+        }
         let mut sitemap = Vec::<Url>::new();
 
         let root_og_image = self.thumbnail().map(|(path, preview)| {
@@ -67,21 +77,21 @@ impl Gallery {
                     }
                     let photo_index = photo_index.unwrap();
                     let photo_path = config.photo::<false>(&path, &photo.output_slug());
-                    ret.insert(
+                    ret_insert(&mut ret,
                         photo_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.image(&self.config), &photo_path)
                         })),
                     );
                     let preview_path = config.preview::<false>(&path, &photo.output_slug());
-                    ret.insert(
+                    ret_insert(&mut ret,
                         preview_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.preview(&self.config), &preview_path)
                         })),
                     );
                     let thumbnail_path = config.thumbnail::<false>(&path, &photo.output_slug());
-                    ret.insert(
+                    ret_insert(&mut ret,
                         thumbnail_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.thumbnail(&self.config), &thumbnail_path)
@@ -100,7 +110,7 @@ impl Gallery {
                     }
 
                     let page_items = page_items.clone();
-                    ret.insert(
+                    ret_insert(&mut ret,
                         config.photo_html::<false>(&path, &photo.output_slug()),
                         LazyLock::new(Box::new(move || {
                             let photo_structured_data = write_structured_data(photo_structured_data(self, photo, config.photo_html::<true>(&path, &photo.output_slug()), self.config.photo::<true>(&path, &photo.output_slug()), Some(self.config.thumbnail::<true>(&path, &photo.output_slug())), true));
@@ -232,7 +242,7 @@ impl Gallery {
                         if chunk.index != 0 {
                             write!(title, " (page {})", chunk.index + 1).unwrap();
                         }
-                        ret.insert(
+                        ret_insert(&mut ret,
                             config.category_html::<false>(&path, &category.slug(), chunk.index),
                             LazyLock::new(Box::new(move || {
                                 render_html(AppProps {
@@ -267,7 +277,7 @@ impl Gallery {
                 Item::Page(page) => {
                     let page_items = page_items.clone();
                     let root_thumbnail = root_og_image.clone();
-                    ret.insert(
+                    ret_insert(&mut ret,
                         config.page_html::<false>(&path, &page.slug()),
                         LazyLock::new(Box::new(move || {
                             render_html(AppProps {
@@ -291,7 +301,8 @@ impl Gallery {
 
         if self.favicon.is_some() {
             let favicon_path = config.favicon::<false>();
-            ret.insert(
+            ret_insert(
+                &mut ret,
                 favicon_path.clone(),
                 LazyLock::new(Box::new(move || {
                     write_image(self.favicon().unwrap(), &favicon_path)
@@ -300,14 +311,16 @@ impl Gallery {
         }
 
         let manifest_path = config.manifest::<false>();
-        ret.insert(
+        ret_insert(
+            &mut ret,
             manifest_path.clone(),
             LazyLock::new(Box::new(move || write_manifest(self))),
         );
 
         if let Some((_, thumbnail)) = self.thumbnail() {
             let manifest_path = "/manifest.png".to_owned();
-            ret.insert(
+            ret_insert(
+                &mut ret,
                 manifest_path.clone(),
                 LazyLock::new(Box::new(move || {
                     write_image(
@@ -321,7 +334,8 @@ impl Gallery {
         for chunk in paginate(&self.children, self.config.items_per_page) {
             let page_items = page_items.clone();
             let root_og_image = root_og_image.clone();
-            ret.insert(
+            ret_insert(
+                &mut ret,
                 self.config.index_html::<false>(chunk.index),
                 LazyLock::new(Box::new(move || {
                     /// https://schema.org/WebSite
@@ -426,7 +440,8 @@ impl Gallery {
                 )
             });
             let sitemap = UrlSet::new(sitemap).unwrap();
-            ret.insert(
+            ret_insert(
+                &mut ret,
                 "/sitemap.xml".to_owned(),
                 LazyLock::new(Box::new(move || {
                     let mut ret = Vec::<u8>::new();
@@ -436,7 +451,8 @@ impl Gallery {
             );
         }
 
-        ret.insert(
+        ret_insert(
+            &mut ret,
             "/robots.txt".to_owned(),
             LazyLock::new(Box::new(move || {
                 let mut robots_txt = String::new();
@@ -453,7 +469,8 @@ impl Gallery {
         );
 
         for file in &self.static_files {
-            ret.insert(
+            ret_insert(
+                &mut ret,
                 file.path.clone(),
                 LazyLock::new(Box::new(move || file.contents.clone())),
             );
