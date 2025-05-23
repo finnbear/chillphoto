@@ -52,6 +52,10 @@ impl CategoryPath {
         Self { segments }
     }
 
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
     pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
         self.segments.iter().map(|s| s.as_str())
     }

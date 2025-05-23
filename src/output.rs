@@ -863,6 +863,20 @@ pub fn app(props: AppProps<'_>) -> Html {
         .enumerate()
         .map(|(i, path)| {
             if path != props.path {
+                let page = paginate(
+                    props.gallery.children(&path).unwrap(),
+                    props
+                        .gallery
+                        .category(&path)
+                        .map(|c| c.config.items_per_page)
+                        .unwrap_or(props.gallery.config.items_per_page),
+                )
+                .position(|page| {
+                    page.items
+                        .iter()
+                        .any(|i| i.slug() == props.path.iter_segments().nth(path.len()).unwrap())
+                })
+                .unwrap();
                 BreadcrumbListElement {
                     _type: "ListItem",
                     name: props
@@ -873,12 +887,12 @@ pub fn app(props: AppProps<'_>) -> Html {
                         .to_owned(),
                     position: i + 1,
                     item: Some(if path.is_root() {
-                        props.gallery.config.index_html::<true>(0)
+                        props.gallery.config.index_html::<true>(page)
                     } else {
                         props.gallery.config.category_html::<true>(
                             &path.pop().unwrap(),
                             path.last_segment().unwrap(),
-                            0,
+                            page,
                         )
                     }),
                 }

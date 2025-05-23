@@ -212,6 +212,14 @@ impl Item {
             None
         }
     }
+
+    pub fn slug(&self) -> String {
+        match self {
+            Self::Category(category) => category.slug(),
+            Self::Photo(photo) => photo.output_slug(),
+            Self::Page(page) => page.slug(),
+        }
+    }
 }
 
 #[derive(Debug)]
