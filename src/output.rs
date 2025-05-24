@@ -876,7 +876,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                         .iter()
                         .any(|i| i.slug() == props.path.iter_segments().nth(path.len()).unwrap())
                 })
-                .unwrap_or_else(|| panic!("could not page of {} for {}", path, props.path));
+                .unwrap_or_default(/* for pages */);
                 BreadcrumbListElement {
                     _type: "ListItem",
                     name: props
