@@ -101,7 +101,7 @@ fn main() {
 
     struct GalleryExtras {
         gallery: Gallery,
-        item_configs: HashMap<CategoryPath, String>,
+        item_configs: HashMap<String, String>,
     }
 
     let entries = glob
@@ -125,7 +125,7 @@ fn main() {
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
         let entire_path = entry.matched().complete().to_owned();
-        let (category_names, categories, name) =
+        let (category_names, categories, except_name, name) =
             if let Some((categories, name)) = entire_path.rsplit_once('/') {
                 let category_names = categories
                     .split('/')
@@ -138,9 +138,9 @@ fn main() {
                         .collect::<Vec<_>>()
                         .join("/"),
                 );
-                (category_names, path, name)
+                (category_names, path, categories, name)
             } else {
-                (Vec::new(), CategoryPath::ROOT, entire_path.as_str())
+                (Vec::new(), CategoryPath::ROOT, "", entire_path.as_str())
             };
 
         if !category_names.is_empty() && category_names[0] == "static" {
@@ -153,15 +153,17 @@ fn main() {
         }
 
         let name_no_extension = name.rsplit_once('.').unwrap().0.to_owned();
+        let path_no_extension = if except_name.is_empty() {
+            name_no_extension.clone()
+        } else {
+            format!("{except_name}/{name_no_extension}")
+        };
 
         if name.ends_with(".toml") {
             let config_text = fs::read_to_string(entry.path()).expect("couldn't read photo config");
 
             let mut gallery = gallery.lock().unwrap();
-            gallery.item_configs.insert(
-                categories.push(name_no_extension.replace(' ', "-")),
-                config_text,
-            );
+            gallery.item_configs.insert(path_no_extension, config_text);
             return;
         }
 
@@ -192,6 +194,7 @@ fn main() {
                     format,
                 },
                 config: PageConfig::default(),
+                src_key: path_no_extension,
             }));
             return;
         }
@@ -215,6 +218,7 @@ fn main() {
             thumbnail: Default::default(),
             config: Default::default(),
             file_date: metadata.modified().or(metadata.created()).ok(),
+            src_key: path_no_extension,
         };
 
         let to_insert = gallery
@@ -283,7 +287,7 @@ fn main() {
     match_pages(Some(&mut gallery.home_text), &mut gallery.children);
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
-            if let Some(config) = item_configs.remove(&path.push(category.slug())) {
+            if let Some(config) = item_configs.remove(&category.src_key) {
                 let config = toml::from_str::<CategoryConfig>(&config).unwrap();
                 category.config = config;
                 category_configs += 1;
@@ -294,8 +298,7 @@ fn main() {
             categories += 1;
         }
         Item::Photo(photo) => {
-            let path = path.push(photo.name.clone());
-            if let Some(config) = item_configs.remove(&path) {
+            if let Some(config) = item_configs.remove(&photo.src_key) {
                 let config = toml::from_str::<PhotoConfig>(&config).expect(&path.to_string());
                 photo.config = config;
                 photo_configs += 1;
@@ -303,8 +306,7 @@ fn main() {
             photos += 1;
         }
         Item::Page(page) => {
-            let path = path.push(page.name.clone());
-            if let Some(config) = item_configs.remove(&path) {
+            if let Some(config) = item_configs.remove(&page.src_key) {
                 let config = toml::from_str::<PageConfig>(&config).expect(&path.to_string());
                 page.config = config;
                 page_configs += 1;

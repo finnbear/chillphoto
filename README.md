@@ -74,6 +74,8 @@ All fields are optional.
 ```toml
 # displayed with gallery thumbnail, used in metadata
 description = "..."
+# override URL slug
+slug = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0
@@ -93,6 +95,8 @@ All fields are optional.
 ```toml
 # alt text
 description = "..."
+# override URL slug
+slug = "..."
 # to display in details, etc.
 location = "..."
 # override
@@ -124,6 +128,8 @@ All fields are optional.
 ```toml
 # used in metadata
 description = "..."
+# override URL slug
+slug = "..."
 # higher -> first
 # -2, -1, 0, 1, 2, etc.
 order = 0

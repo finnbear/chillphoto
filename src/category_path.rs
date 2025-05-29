@@ -44,6 +44,7 @@ impl CategoryPath {
         }
     }
 
+    /// `segment` must not have spaces.
     #[track_caller]
     pub fn push(&self, segment: String) -> Self {
         assert!(!segment.contains(' '), "{}", segment);

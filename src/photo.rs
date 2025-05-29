@@ -20,6 +20,7 @@ pub struct Photo {
     pub exif: ExifData,
     pub file_date: Option<SystemTime>,
     pub config: PhotoConfig,
+    pub src_key: String,
 }
 
 impl Photo {
@@ -27,8 +28,18 @@ impl Photo {
         self.config.rename.as_deref().unwrap_or(&self.name)
     }
 
-    pub fn output_slug(&self) -> String {
-        self.output_name().replace(' ', "-")
+    pub fn slug(&self) -> String {
+        self.config.slug.clone().unwrap_or_else(|| {
+            {
+                let name = self.output_name();
+                if name.starts_with("IMG") || name.starts_with("DSC") {
+                    name.to_owned()
+                } else {
+                    name.to_lowercase()
+                }
+            }
+            .replace(' ', "-")
+        })
     }
 
     pub fn date_time(&self) -> Option<NaiveDateTime> {

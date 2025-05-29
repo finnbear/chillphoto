@@ -64,7 +64,7 @@ impl Gallery {
                     }
                 }
                 Item::Photo(photo) => {
-                    if photo.output_slug() == path.last_segment().unwrap() {
+                    if photo.slug() == path.last_segment().unwrap() {
                         return photo.output_name();
                     }
                 }
@@ -133,6 +133,7 @@ impl Gallery {
                     text: None,
                     children: Vec::new(),
                     config: CategoryConfig::default(),
+                    src_key: names.join("/"),
                 }));
 
                 current_items.last_mut().unwrap().category_mut().unwrap()
@@ -216,7 +217,7 @@ impl Item {
     pub fn slug(&self) -> String {
         match self {
             Self::Category(category) => category.slug(),
-            Self::Photo(photo) => photo.output_slug(),
+            Self::Photo(photo) => photo.slug(),
             Self::Page(page) => page.slug(),
         }
     }
@@ -228,11 +229,16 @@ pub struct Category {
     pub text: Option<RichText>,
     pub children: Vec<Item>,
     pub config: CategoryConfig,
+    /// foo/bar baz/Quxx
+    pub src_key: String,
 }
 
 impl Category {
     pub fn slug(&self) -> String {
-        self.name.replace(' ', "-")
+        self.config
+            .slug
+            .clone()
+            .unwrap_or_else(|| self.name.to_lowercase().replace(' ', "-"))
     }
 
     pub fn thumbnail(&self, path: &CategoryPath) -> Option<(CategoryPath, &Photo)> {
@@ -295,11 +301,15 @@ pub struct Page {
     pub name: String,
     pub text: RichText,
     pub config: PageConfig,
+    pub src_key: String,
 }
 
 impl Page {
     pub fn slug(&self) -> String {
-        self.name.replace(' ', "-")
+        self.config
+            .slug
+            .clone()
+            .unwrap_or_else(|| self.name.to_lowercase().replace(' ', "-"))
     }
 }
 

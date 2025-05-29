@@ -225,6 +225,7 @@ impl GalleryConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct PhotoConfig {
+    pub slug: Option<String>,
     /// Author override.
     #[serde(default)]
     pub author: Option<String>,
@@ -274,6 +275,7 @@ pub struct Point2 {
 
 #[derive(Deserialize, Debug)]
 pub struct CategoryConfig {
+    pub slug: Option<String>,
     #[serde(default)]
     pub order: i64,
     pub thumbnail: Option<String>,
@@ -292,6 +294,7 @@ impl Default for CategoryConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct PageConfig {
+    pub slug: Option<String>,
     #[serde(default)]
     pub order: i64,
     pub description: Option<String>,
