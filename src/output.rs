@@ -52,7 +52,7 @@ impl Gallery {
 
         let root_og_image = self.thumbnail().map(|(path, preview)| {
             (
-                self.config.preview::<true>(&path, &preview.name),
+                self.config.preview::<true>(&path, preview.output_name()),
                 preview.preview_dimensions(&self.config),
             )
         });
@@ -268,7 +268,7 @@ impl Gallery {
                                         next: (chunk.index != chunk.count - 1)
                                             .then(|| config.category_html::<true>(&path, &category.slug(), chunk.index + 1)),
                                     }),
-                                    og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, &preview.name), preview.preview_dimensions(&self.config)))
+                                    og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, preview.output_name()), preview.preview_dimensions(&self.config)))
                                 })
                             })),
                         );
