@@ -144,7 +144,7 @@ unlisted = true
 - [x] Arbitrarily-nested photo categories
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Input essential EXIF metadata
-- [x] Output HTML, Sitemap, PWA, structured data, and Open Graph metadata
+- [x] Output HTML, Sitemap, PWA, structured data, XMP, and Open Graph metadata
 - [x] AI photo descriptions
 - [x] Basic image adjustment (exposure)
 - [x] Pagination

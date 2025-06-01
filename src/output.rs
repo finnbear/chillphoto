@@ -13,7 +13,8 @@ use sitemap_rs::{
     url_builder::UrlBuilder,
     url_set::UrlSet,
 };
-use std::{collections::HashMap, fmt::Write, io::Cursor, sync::LazyLock};
+use std::{collections::HashMap, fmt::Write, fs, io::Cursor, sync::LazyLock};
+use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
 /// Must be at least 144.
@@ -77,24 +78,25 @@ impl Gallery {
                     }
                     let photo_index = photo_index.unwrap();
                     let photo_path = config.photo::<false>(&path, &photo.slug());
+                    let xmp = Some((self, photo));
                     ret_insert(&mut ret,
                         photo_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.image(&self.config), &photo_path)
+                            write_image(photo.image(&self.config), &photo_path, xmp)
                         })),
                     );
                     let preview_path = config.preview::<false>(&path, &photo.slug());
                     ret_insert(&mut ret,
                         preview_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.preview(&self.config), &preview_path)
+                            write_image(photo.preview(&self.config), &preview_path, xmp)
                         })),
                     );
                     let thumbnail_path = config.thumbnail::<false>(&path, &photo.slug());
                     ret_insert(&mut ret,
                         thumbnail_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.thumbnail(&self.config), &thumbnail_path)
+                            write_image(photo.thumbnail(&self.config), &thumbnail_path, xmp)
                         })),
                     );
 
@@ -305,7 +307,7 @@ impl Gallery {
                 &mut ret,
                 favicon_path.clone(),
                 LazyLock::new(Box::new(move || {
-                    write_image(self.favicon().unwrap(), &favicon_path)
+                    write_image(self.favicon().unwrap(), &favicon_path, None)
                 })),
             );
         }
@@ -326,6 +328,7 @@ impl Gallery {
                     write_image(
                         &thumbnail.custom_thumbnail(&self.config, MANIFEST_ICON_RESOLUTION),
                         &manifest_path,
+                        None,
                     )
                 })),
             );
@@ -1108,11 +1111,134 @@ fn join<T: Clone>(slice: &[T], sep: &T) -> Vec<T> {
     result
 }
 
-pub fn write_image(img: &RgbImage, path: &str) -> Vec<u8> {
+pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) -> Vec<u8> {
     let mut ret = Cursor::new(Vec::new());
-    img.write_to(&mut ret, ImageFormat::from_path(path).unwrap())
+    let format = ImageFormat::from_path(path).unwrap();
+    img.write_to(&mut ret, format).unwrap();
+    let mut buf = ret.into_inner();
+    if let Some((gallery, photo)) = xmp {
+        // Awaiting https://github.com/adobe/xmp-toolkit-rs/issues/265
+        let file = tempfile::Builder::new()
+            .suffix(&format!(".xmp.{}", format.extensions_str()[0]))
+            .tempfile()
+            .unwrap();
+        let path = file.path();
+        fs::write(&path, &buf).unwrap();
+        let mut xmp_file = xmp_toolkit::XmpFile::new().unwrap();
+        xmp_file
+            .open_file(
+                &path,
+                OpenFileOptions::default()
+                    .for_update()
+                    .only_xmp()
+                    .use_smart_handler(),
+            )
+            .unwrap();
+        let mut xmp = XmpMeta::new().unwrap();
+
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            XmpMeta::register_namespace(
+                "http://ns.useplus.org/ldf/xmp/1.0/
+",
+                "plus",
+            )
+            .unwrap();
+        });
+
+        xmp.set_property(
+            xmp_ns::DC,
+            "title",
+            &XmpValue::new(photo.output_name().to_owned()),
+        )
         .unwrap();
-    ret.into_inner()
+
+        let author = photo
+            .config
+            .author
+            .clone()
+            .or_else(|| gallery.config.author.clone());
+        let copyright_year = photo.date_time().map(|d| d.year());
+
+        if let Some(copyright_notice) = copyright_notice(author.as_deref(), copyright_year) {
+            xmp.set_property(
+                xmp_ns::DC,
+                "rights",
+                &XmpValue::new(copyright_notice.clone()),
+            )
+            .unwrap();
+            xmp.set_property(
+                xmp_ns::PHOTOSHOP,
+                "credit",
+                &XmpValue::new(copyright_notice),
+            )
+            .unwrap();
+        }
+
+        if let Some(author) = author {
+            xmp.set_property(xmp_ns::DC, "creator", &XmpValue::new(author))
+                .unwrap();
+        }
+
+        if let Some(license_url) = photo
+            .config
+            .license_url
+            .clone()
+            .or_else(|| gallery.config.license_url.clone())
+        {
+            xmp.set_property(
+                xmp_ns::XMP_RIGHTS,
+                "WebStatement",
+                &XmpValue::new(license_url),
+            )
+            .unwrap();
+        }
+        if let Some(licensor_url) = gallery.config.root_url.clone() {
+            xmp.set_struct_field(
+                "http://ns.useplus.org/ldf/xmp/1.0/",
+                "plus:Licensor",
+                "http://ns.useplus.org/ldf/xmp/1.0/",
+                "plus:LicensorURL",
+                &XmpValue::new(licensor_url),
+            )
+            .unwrap();
+        }
+
+        if gallery.config.disallow_ai_training {
+            xmp.set_property(
+                "http://ns.useplus.org/ldf/xmp/1.0/",
+                "plus:DataMining",
+                &XmpValue::new(
+                    "http://ns.useplus.org/ldf/vocab/DMI-PROHIBITED-AIMLTRAINING".to_owned(),
+                ),
+            )
+            .unwrap();
+        }
+
+        if let Some(description) = photo.config.description.clone() {
+            xmp.set_property(
+                xmp_ns::IPTC_CORE,
+                "AltTextAccessibility",
+                &XmpValue::new(description),
+            )
+            .unwrap();
+        }
+
+        xmp.set_name("chillphoto").unwrap();
+
+        assert!(xmp_file.can_put_xmp(&xmp));
+
+        xmp_file.put_xmp(&xmp).unwrap();
+
+        xmp_file.try_close().unwrap();
+
+        drop(xmp_file);
+
+        buf = fs::read(&path).unwrap();
+
+        drop(file);
+    }
+    buf
 }
 
 pub fn rich_text_html(text: &RichText) -> Html {
@@ -1372,12 +1498,7 @@ fn photo_structured_data(
         creator: author_person.clone(),
         copyright_holder: author_person.clone(),
         copyright_year,
-        copyright_notice: match (author.as_ref(), copyright_year) {
-            (Some(a), Some(y)) => Some(format!("© {y} {a}")),
-            (Some(a), None) => Some(format!("© {a}")),
-            (None, Some(y)) => Some(format!("© {y}")),
-            (None, None) => None,
-        },
+        copyright_notice: copyright_notice(author.map(|a| a.as_str()), copyright_year),
         credit_text: author.cloned(),
         license: license.cloned(),
         acquire_license_page: gallery.config.acquire_license_url.clone(),
@@ -1420,4 +1541,13 @@ struct BreadcrumbListElement {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     item: Option<String>,
+}
+
+fn copyright_notice(author: Option<&str>, copyright_year: Option<i32>) -> Option<String> {
+    match (author, copyright_year) {
+        (Some(a), Some(y)) => Some(format!("© {y} {a}")),
+        (Some(a), None) => Some(format!("© {a}")),
+        (None, Some(y)) => Some(format!("© {y}")),
+        (None, None) => None,
+    }
 }
