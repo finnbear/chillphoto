@@ -8,7 +8,7 @@ pub enum OutputFormat {
     #[serde(rename = "jpg", alias = "jpeg")]
     Jpg,
     #[serde(rename = "webp")]
-    Webp,
+    WebP,
 }
 
 impl Display for OutputFormat {

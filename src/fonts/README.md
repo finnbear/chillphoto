@@ -1,0 +1,1 @@
+Liberation Mono is licensed under the Liberation Fonts license, see https://fedoraproject.org/wiki/Licensing/LiberationFontLicense

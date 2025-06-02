@@ -148,6 +148,7 @@ unlisted = true
 - [x] AI photo descriptions
 - [x] Basic image adjustment (exposure)
 - [x] Pagination
+- [x] Generate US Copyright Office group registration ZIP files
 - [ ] 404 page
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling

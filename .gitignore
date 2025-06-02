@@ -22,4 +22,6 @@ target/
 
 /input
 /output
+/build
 chillphoto.toml
+*.zip
