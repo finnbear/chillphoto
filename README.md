@@ -66,6 +66,7 @@ image_ai_model = "gemma3"
 # ai_description_system_prompt = "override system prompt"
 ai_description_hint = "do not mention text in photos"
 items_per_page = 30
+date_format = "..." # see https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 ```
 
 ### Category config
@@ -120,6 +121,8 @@ thumbnail_crop_center = {
 ai_description_hint = "it's dirt not sand"
 # stops of exposure to digitally add (or subtract).
 exposure = 0.33
+# specify or overeride the photo's date, using the gallery's date format
+date = "..."
 ```
 
 ### Page config
@@ -141,7 +144,7 @@ unlisted = true
 - [x] Instantly preview gallery via embedded server
 - [x] Generate a completely static gallery website
 - [x] Full, preview, and thumbnail sizes
-- [x] Arbitrarily-nested photo categories
+- [x] Arbitrarily-nested categories for photos and pages
 - [x] Arbitrary plain-text, Markdown, or HTML pages and captions
 - [x] Input essential EXIF metadata
 - [x] Output HTML, Sitemap, PWA, structured data, XMP, and Open Graph metadata
@@ -153,7 +156,6 @@ unlisted = true
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
 - [ ] Support for themes
-- [ ] Pages within categories
 - [ ] Archive page organized by date
 - [ ] Optional comment support (via a 3rd party comment form)
 - [ ] RSS feed

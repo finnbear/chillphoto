@@ -1,4 +1,5 @@
 use crate::image_ai::init_image_ai;
+use crate::output::Order;
 use category_path::CategoryPath;
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use clap::{Parser, Subcommand};
@@ -16,7 +17,6 @@ use photo::Photo;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serve::serve;
 use static_file::StaticFile;
-use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, ErrorKind, Read, Seek, SeekFrom, Write};
@@ -362,43 +362,6 @@ fn main() {
             pages += 1;
         }
     });
-
-    #[derive(Eq, PartialEq, Ord, PartialOrd)]
-    enum Order {
-        Category {
-            order: Reverse<i64>,
-            name: String,
-        },
-        Photo {
-            order: Reverse<i64>,
-            date: Reverse<Option<NaiveDateTime>>,
-            name: String,
-        },
-        Page {
-            order: Reverse<i64>,
-            name: String,
-        },
-    }
-
-    impl Order {
-        fn new(item: &Item) -> Self {
-            match item {
-                Item::Category(category) => Order::Category {
-                    order: Reverse(category.config.order),
-                    name: category.name.clone(),
-                },
-                Item::Photo(photo) => Order::Photo {
-                    order: Reverse(photo.config.order),
-                    date: Reverse(photo.date_time()),
-                    name: photo.name.clone(),
-                },
-                Item::Page(page) => Order::Page {
-                    order: Reverse(page.config.order),
-                    name: page.name.clone(),
-                },
-            }
-        }
-    }
 
     gallery.children.sort_by_key(Order::new);
     gallery.visit_items_mut(|_, item| match item {

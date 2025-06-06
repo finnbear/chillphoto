@@ -3,7 +3,7 @@ use crate::{
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
 };
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDateTime};
 use image::{ImageFormat, RgbImage};
 use serde::Serialize;
 use sitemap_rs::{
@@ -12,27 +12,35 @@ use sitemap_rs::{
     url_builder::UrlBuilder,
     url_set::UrlSet,
 };
-use std::{collections::HashMap, fmt::Write, fs, io::Cursor, sync::LazyLock};
+use std::{cmp::Reverse, collections::HashMap, fmt::Write, fs, io::Cursor, sync::LazyLock};
 use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
 
 /// Must be at least 144.
 const MANIFEST_ICON_RESOLUTION: u32 = 256;
 
+fn page_items<'a>(gallery: &'a Gallery, path: &CategoryPath) -> Vec<(String, &'a Page)> {
+    let mut ret: Vec<(String, &'a Page)> = path
+        .iter_paths()
+        .flat_map(|path| {
+            gallery
+                .children(&path)
+                .into_iter()
+                .flatten()
+                .filter_map(|i| i.page())
+                .filter(|p| !p.config.unlisted)
+                .map(move |p| (gallery.config.page_html::<true>(&path, &p.slug()), p))
+        })
+        .collect();
+    ret.sort_by_key(|(_, p)| Order::new_page(p));
+    ret
+}
+
 impl Gallery {
     pub fn output<'a>(
         &'a self,
     ) -> HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>> {
         let config = &self.config;
-
-        // TODO: nested pages.
-        let page_items = self
-            .children
-            .iter()
-            .filter_map(|i| i.page())
-            .filter(|p| !p.config.unlisted)
-            .map(|p| (config.page_html::<true>(&CategoryPath::ROOT, &p.slug()), p))
-            .collect::<Vec<_>>();
 
         let mut ret = HashMap::<
             String,
@@ -110,7 +118,7 @@ impl Gallery {
                             ]).build().unwrap())
                     }
 
-                    let page_items = page_items.clone();
+                    let page_items = page_items(self, &path);
                     ret_insert(&mut ret,
                         config.photo_html::<false>(&path, &photo.slug()),
                         LazyLock::new(Box::new(move || {
@@ -235,6 +243,7 @@ impl Gallery {
                 }
                 Item::Category(category) => {
                     let category_path = path.push(category.slug());
+                    let page_items = page_items(self, &category_path);
                     for chunk in paginate(&category.children, category.config.items_per_page) {
                         let path = path.clone();
                         let category_path = category_path.clone();
@@ -276,7 +285,7 @@ impl Gallery {
                     };
                 }
                 Item::Page(page) => {
-                    let page_items = page_items.clone();
+                    let page_items = page_items(self, &path);
                     let root_thumbnail = root_og_image.clone();
                     ret_insert(&mut ret,
                         config.page_html::<false>(&path, &page.slug()),
@@ -333,6 +342,7 @@ impl Gallery {
             );
         }
 
+        let page_items = page_items(self, &CategoryPath::ROOT);
         for chunk in paginate(&self.children, self.config.items_per_page) {
             let page_items = page_items.clone();
             let root_og_image = root_og_image.clone();
@@ -1548,5 +1558,46 @@ fn copyright_notice(author: Option<&str>, copyright_year: Option<i32>) -> Option
         (Some(a), None) => Some(format!("© {a}")),
         (None, Some(y)) => Some(format!("© {y}")),
         (None, None) => None,
+    }
+}
+
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
+pub enum Order {
+    Category {
+        order: Reverse<i64>,
+        name: String,
+    },
+    Photo {
+        order: Reverse<i64>,
+        date: Reverse<Option<NaiveDateTime>>,
+        name: String,
+    },
+    Page {
+        order: Reverse<i64>,
+        name: String,
+    },
+}
+
+impl Order {
+    pub fn new_page(page: &Page) -> Self {
+        Self::Page {
+            order: Reverse(page.config.order),
+            name: page.name.clone(),
+        }
+    }
+
+    pub fn new(item: &Item) -> Self {
+        match item {
+            Item::Category(category) => Self::Category {
+                order: Reverse(category.config.order),
+                name: category.name.clone(),
+            },
+            Item::Photo(photo) => Self::Photo {
+                order: Reverse(photo.config.order),
+                date: Reverse(photo.date_time()),
+                name: photo.name.clone(),
+            },
+            Item::Page(page) => Self::new_page(page),
+        }
     }
 }
