@@ -60,7 +60,7 @@ enum Command {
     },
     /// Output a year's worth of photos from a single author
     /// in a format suitable (not legal advice) for the US
-    /// copyright office.
+    /// Copyright Office.
     ///
     /// WARNING:
     /// This makes several assumptions that, if incorrect,
@@ -81,13 +81,15 @@ enum Command {
         /// This will be used to filter photos.
         #[arg(long)]
         author: String,
-        /// Get this from the copyright office website.
+        /// Get this from the Copyright Office website.
         #[arg(long)]
         case_number: String,
-        /// Start on this photo.
+        /// Start on this photo (name or filename).
         #[arg(long)]
         start: Option<String>,
-        /// Limit to this many photos.
+        /// Limit to this many photos. This is useful for staying
+        /// under the Copyright Office's limits, such as a 500MB
+        /// upload limit.
         #[arg(long, default_value_t = 750)]
         limit: usize,
     },
@@ -259,6 +261,7 @@ fn main() {
             config: Default::default(),
             file_date: metadata.modified().or(metadata.created()).ok(),
             src_key: path_no_extension,
+            parsed_config_date: None,
         };
 
         let to_insert = gallery
@@ -325,6 +328,7 @@ fn main() {
         }
     };
     match_pages(Some(&mut gallery.home_text), &mut gallery.children);
+    let date_format = gallery.config.date_format.clone();
     gallery.visit_items_mut(|path, item| match item {
         Item::Category(category) => {
             if let Some(config) = item_configs.remove(&category.src_key) {
@@ -341,6 +345,10 @@ fn main() {
             if let Some(config) = item_configs.remove(&photo.src_key) {
                 let config = toml::from_str::<PhotoConfig>(&config).expect(&path.to_string());
                 photo.config = config;
+                if let Some(date) = &photo.config.date {
+                    photo.parsed_config_date =
+                        Some(NaiveDate::parse_from_str(date, &date_format).unwrap());
+                }
                 photo_configs += 1;
             }
             photos += 1;

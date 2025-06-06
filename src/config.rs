@@ -1,6 +1,7 @@
 use crate::{
     category_path::CategoryPath, format::OutputFormat, util::add_trailing_slash_if_nonempty,
 };
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -47,6 +48,19 @@ pub struct GalleryConfig {
     pub pagination_flavor: PaginationFlavor,
     #[serde(default = "default_items_per_page")]
     pub items_per_page: usize,
+    /// Format specification: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+    #[serde(default = "default_date_format")]
+    pub date_format: String,
+}
+
+fn default_date_format() -> String {
+    "%b %-d, %Y".to_owned()
+}
+
+impl GalleryConfig {
+    pub fn format_date(&self, date: NaiveDate) -> String {
+        date.format(&self.date_format).to_string()
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -251,6 +265,9 @@ pub struct PhotoConfig {
     #[serde(default)]
     pub exposure: f32,
     pub rename: Option<String>,
+    /// Specify/override the date the photo was taken,
+    /// in the `date_format` of the gallery configuration.
+    pub date: Option<String>,
 }
 
 fn default_thumbnail_crop_factor() -> f64 {

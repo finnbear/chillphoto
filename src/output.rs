@@ -2,7 +2,6 @@ use crate::{
     category_path::CategoryPath,
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
     photo::Photo,
-    util::date_format,
 };
 use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
@@ -166,7 +165,7 @@ impl Gallery {
                                                 title={"Date Taken"}
                                                 class={"sidebar_details_panel_text"}
                                             >
-                                                {date_format(date_time.date())}
+                                                {self.config.format_date(date_time.date())}
                                             </time>
                                         }
                                         if photo.exif.focal_length.is_some() || photo.exif.aperture.is_some() {

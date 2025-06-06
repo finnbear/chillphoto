@@ -3,7 +3,7 @@ use crate::{
     exif::ExifData,
     gallery::RichText,
 };
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use image::{
     imageops::{self, FilterType},
     DynamicImage, ImageDecoder, ImageReader, RgbImage,
@@ -19,6 +19,7 @@ pub struct Photo {
     pub thumbnail: OnceLock<RgbImage>,
     pub exif: ExifData,
     pub file_date: Option<SystemTime>,
+    pub parsed_config_date: Option<NaiveDate>,
     pub config: PhotoConfig,
     pub src_key: String,
 }
@@ -43,16 +44,19 @@ impl Photo {
     }
 
     pub fn date_time(&self) -> Option<NaiveDateTime> {
-        self.exif.date_time().or_else(|| {
-            self.file_date.and_then(|fd| {
-                DateTime::from_timestamp_millis(
-                    fd.duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as i64,
-                )
-                .map(|dt| dt.naive_local())
+        self.parsed_config_date
+            .map(|d| NaiveDateTime::new(d, NaiveTime::from_hms_opt(0, 0, 0).unwrap()))
+            .or_else(|| self.exif.date_time())
+            .or_else(|| {
+                self.file_date.and_then(|fd| {
+                    DateTime::from_timestamp_millis(
+                        fd.duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as i64,
+                    )
+                    .map(|dt| dt.naive_local())
+                })
             })
-        })
     }
 
     pub fn image_dimensions(&self, config: &GalleryConfig) -> (u32, u32) {
