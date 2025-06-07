@@ -524,7 +524,7 @@ pub struct RelativeNavigation {
 
 fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item]) -> Html {
     html! {
-        <div id="page_main_body_items">
+        <section id="page_main_body_items" data-nosnippet="nosnippet">
             {items.iter().filter_map(|child| {
                 match child {
                     Item::Photo(photo) => {
@@ -604,7 +604,7 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
                     Item::Page(_) => None
                 }
             }).collect::<Html>()}
-        </div>
+        </section>
     }
 }
 
