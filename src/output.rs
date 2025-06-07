@@ -1147,12 +1147,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) 
 
         static ONCE: std::sync::Once = std::sync::Once::new();
         ONCE.call_once(|| {
-            XmpMeta::register_namespace(
-                "http://ns.useplus.org/ldf/xmp/1.0/
-",
-                "plus",
-            )
-            .unwrap();
+            XmpMeta::register_namespace("http://ns.useplus.org/ldf/xmp/1.0/", "plus").unwrap();
         });
 
         xmp.set_property(
