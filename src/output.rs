@@ -761,6 +761,14 @@ pub fn app(props: AppProps<'_>) -> Html {
             margin: 2rem;
         }
 
+        #page_main_body > :first-child {
+            margin-top: 0;
+        }
+
+        #page_main_body > :last-child {
+            margin-bottom: 0;
+        }
+
         #page_main_body_items {
             display: flex;
             flex-wrap: wrap;
