@@ -1,7 +1,7 @@
 use crate::{
-    config::{GalleryConfig, PhotoConfig},
-    exif::ExifData,
+    gallery::ExifData,
     gallery::RichText,
+    gallery::{GalleryConfig, PhotoConfig},
 };
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use image::{

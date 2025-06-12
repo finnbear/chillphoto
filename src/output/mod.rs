@@ -1,7 +1,7 @@
 use crate::{
-    category_path::CategoryPath,
+    gallery::CategoryPath,
+    gallery::Photo,
     gallery::{Gallery, Item, Page, RichText, RichTextFormat},
-    photo::Photo,
 };
 use chrono::{Datelike, NaiveDateTime};
 use image::{ImageFormat, RgbImage};
@@ -15,6 +15,11 @@ use sitemap_rs::{
 use std::{cmp::Reverse, collections::HashMap, fmt::Write, fs, io::Cursor, sync::LazyLock};
 use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{classes, function_component, html, AttrValue, Html, LocalServerRenderer, Properties};
+
+mod format;
+mod serve;
+pub use format::*;
+pub use serve::*;
 
 /// Must be at least 144.
 const MANIFEST_ICON_RESOLUTION: u32 = 256;

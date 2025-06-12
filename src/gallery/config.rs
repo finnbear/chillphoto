@@ -1,6 +1,4 @@
-use crate::{
-    category_path::CategoryPath, format::OutputFormat, util::add_trailing_slash_if_nonempty,
-};
+use crate::{gallery::CategoryPath, output::OutputFormat, util::add_trailing_slash_if_nonempty};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use std::path::Path;

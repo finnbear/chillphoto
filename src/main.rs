@@ -1,22 +1,22 @@
 use crate::image_ai::init_image_ai;
 use crate::output::Order;
-use category_path::CategoryPath;
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use clap::{Parser, Subcommand};
-use config::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
-use exif::ExifData;
-use format::OutputFormat;
+use copyright_registration::MarginFrameCellDecorator;
+use gallery::CategoryPath;
+use gallery::ExifData;
+use gallery::Photo;
+use gallery::StaticFile;
+use gallery::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
 use gallery::{Gallery, Item, Page, RichText, RichTextFormat};
 use genpdfi::fonts::{FontData, FontFamily};
 use genpdfi::style::{Style, StyledString};
 use genpdfi::{Margins, SimplePageDecorator};
-use genpdfi_cell_decorator::MarginFrameCellDecorator;
 use indicatif::{ProgressBar, ProgressStyle};
+use output::serve;
 use output::write_image;
-use photo::Photo;
+use output::OutputFormat;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use serve::serve;
-use static_file::StaticFile;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, ErrorKind, Read, Seek, SeekFrom, Write};
@@ -26,17 +26,10 @@ use toml_edit::DocumentMut;
 use util::remove_dir_contents;
 use wax::Glob;
 
-mod category_path;
-mod config;
-mod exif;
-mod format;
+mod copyright_registration;
 mod gallery;
-mod genpdfi_cell_decorator;
 mod image_ai;
 mod output;
-mod photo;
-mod serve;
-mod static_file;
 mod util;
 
 #[derive(Parser)]
@@ -529,22 +522,24 @@ fn main() {
 
         let mut doc = genpdfi::Document::new(FontFamily {
             regular: FontData::new(
-                include_bytes!("./fonts/LiberationMono-Regular.ttf").to_vec(),
+                include_bytes!("./copyright_registration/fonts/LiberationMono-Regular.ttf")
+                    .to_vec(),
                 None,
             )
             .unwrap(),
             italic: FontData::new(
-                include_bytes!("./fonts/LiberationMono-Italic.ttf").to_vec(),
+                include_bytes!("./copyright_registration/fonts/LiberationMono-Italic.ttf").to_vec(),
                 None,
             )
             .unwrap(),
             bold: FontData::new(
-                include_bytes!("./fonts/LiberationMono-Bold.ttf").to_vec(),
+                include_bytes!("./copyright_registration/fonts/LiberationMono-Bold.ttf").to_vec(),
                 None,
             )
             .unwrap(),
             bold_italic: FontData::new(
-                include_bytes!("./fonts/LiberationMono-BoldItalic.ttf").to_vec(),
+                include_bytes!("./copyright_registration/fonts/LiberationMono-BoldItalic.ttf")
+                    .to_vec(),
                 None,
             )
             .unwrap(),

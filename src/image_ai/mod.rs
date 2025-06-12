@@ -1,6 +1,5 @@
 use crate::{
-    category_path::CategoryPath, config::GalleryConfig, gallery::Gallery, photo::Photo,
-    util::checksum,
+    gallery::CategoryPath, gallery::Gallery, gallery::GalleryConfig, gallery::Photo, util::checksum,
 };
 use async_openai::types::{
     ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
