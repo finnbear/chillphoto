@@ -241,3 +241,25 @@ pub struct BreadcrumbListElement {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub item: Option<String>,
 }
+
+#[derive(Serialize)]
+pub struct SearchActionStructuredData {
+    pub _type: &'static str,
+    pub target: String,
+    pub query: &'static str,
+}
+
+/// https://schema.org/WebSite
+#[derive(Serialize)]
+pub struct WebSiteStructuredData {
+    #[serde(rename = "@type")]
+    pub _type: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    pub name: String,
+    #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "copyrightHolder", skip_serializing_if = "Option::is_none")]
+    pub copyright_holder: Option<PersonStructuredData>,
+    pub potential_action: Option<SearchActionStructuredData>,
+}

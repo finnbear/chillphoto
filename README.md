@@ -151,6 +151,7 @@ unlisted = true
 - [x] AI photo descriptions
 - [x] Basic image adjustment (exposure)
 - [x] Pagination
+- [x] Search box
 - [x] Generate US Copyright Office group registration ZIP files
 - [ ] 404 page
 - [ ] Hot-reloading

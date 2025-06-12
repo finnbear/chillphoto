@@ -22,9 +22,13 @@ pub fn serve(
     let mut queue = output.iter().collect::<Vec<_>>();
     queue.sort_by_key(|(path, _)| !path.contains("_thumbnail"));
     let work = &Mutex::new(queue.iter());
+    let available_parallelism = available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or_default()
+        .max(1);
     std::thread::scope(|scope| {
         // Background initialization.
-        let cpus = available_parallelism().map(|n| n.get()).unwrap_or(1);
+        let cpus = (available_parallelism / 2).min(4);
         for thread in 0..cpus {
             let _guard = Guard::new(background_threads);
             scope.spawn(move || {
@@ -35,7 +39,7 @@ pub fn serve(
                 } {
                     LazyLock::force(i);
                     while http_threads.load(Ordering::SeqCst) > thread {
-                        std::thread::sleep(Duration::from_millis(100));
+                        std::thread::sleep(Duration::from_millis(1000));
                     }
                 }
 
@@ -65,8 +69,6 @@ pub fn serve(
                 continue;
             };
             scope.spawn(move || {
-                let _guard = Guard::new(http_threads);
-
                 let mut buf = Vec::new();
 
                 let (request, _body) = loop {
@@ -119,11 +121,19 @@ pub fn serve(
                     path.push_str("index.html")
                 }
                 if let Some(query) = request.uri().query() {
-                    use std::fmt::Write;
-                    write!(path, "?{query}").unwrap();
+                    if query.contains("page=") {
+                        use std::fmt::Write;
+                        write!(path, "?{query}").unwrap();
+                    }
                 }
 
                 let response = if let Some(file) = output.get(&path) {
+                    while http_threads.load(Ordering::SeqCst) >= available_parallelism {
+                        std::thread::sleep(Duration::from_secs(50));
+                    }
+
+                    let _guard = Guard::new(http_threads);
+
                     http::Response::builder()
                         .version(request.version())
                         .status(200)

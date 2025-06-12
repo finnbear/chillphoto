@@ -219,6 +219,10 @@ impl GalleryConfig {
         }
     }
 
+    pub fn search_html<const PUBLIC: bool>(&self) -> String {
+        self.page_html::<PUBLIC>(&CategoryPath::ROOT, "search")
+    }
+
     pub fn index_html<const PUBLIC: bool>(&self, page: usize) -> String {
         let base = if page == 0 || matches!(self.pagination_flavor, PaginationFlavor::Query) {
             "/".to_owned()

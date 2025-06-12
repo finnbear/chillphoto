@@ -2,7 +2,8 @@ use crate::{
     gallery::{CategoryPath, Gallery, Page, RichText, RichTextFormat},
     output::{
         paginate, rich_text_html, write_speculation_rules, write_structured_data, BreadcrumbList,
-        BreadcrumbListElement, RelativeNavigation,
+        BreadcrumbListElement, PersonStructuredData, RelativeNavigation,
+        SearchActionStructuredData, WebSiteStructuredData,
     },
     util::join,
 };
@@ -97,9 +98,13 @@ pub fn app(props: AppProps<'_>) -> Html {
 
         #breadcrumbs {
             background-color: #505050;
-            padding: 0.5rem;
-            padding-left: 2rem;
+            padding: 0.5rem 2rem;
             color: white;
+            display: flex;
+            flex-direction: row;
+            gap: 0.25rem;
+            align-items: center;
+            white-space: nowrap;
         }
 
         .breadcrumb {
@@ -109,6 +114,16 @@ pub fn app(props: AppProps<'_>) -> Html {
         .breadcrumb_final {
             color: white;
             font-weight: bold;
+        }
+
+        #search_form {
+            margin-left: auto;
+        }
+
+        @media (max-width: 600px) {
+            #search_form {
+                display: none;
+            }
         }
 
         #main_and_sidebar {
@@ -131,7 +146,7 @@ pub fn app(props: AppProps<'_>) -> Html {
             margin-bottom: 0;
         }
 
-        #page_main_body_items {
+        #page_main_body_items, #page_main_body_search_results {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
@@ -283,6 +298,8 @@ pub fn app(props: AppProps<'_>) -> Html {
                     _type: "ListItem",
                     name: if path.is_root() {
                         "Home".to_owned()
+                    } else if path.len() == 1 && path.last_segment() == Some("search") {
+                        "Search".to_owned()
                     } else {
                         props.gallery.item_name(&path).to_owned()
                     },
@@ -292,6 +309,27 @@ pub fn app(props: AppProps<'_>) -> Html {
             }
         })
         .collect::<Vec<_>>();
+
+    let web_site_structured_data =
+        write_structured_data(WebSiteStructuredData {
+            _type: "WebSite",
+            url: props.gallery.config.root_url.clone(),
+            name: props.gallery.config.title.clone(),
+            description: props.gallery.config.description.clone(),
+            copyright_holder: props.gallery.config.author.clone().map(|name| {
+                PersonStructuredData {
+                    _type: "Person",
+                    name,
+                }
+            }),
+            potential_action: props.gallery.config.root_url.as_ref().map(|root_url| {
+                SearchActionStructuredData {
+                    _type: "SearchAction",
+                    target: format!("{root_url}/search?&query={{query}}"),
+                    query: "required",
+                }
+            }),
+        });
 
     html! {
         <html lang="en">
@@ -355,6 +393,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                         .unwrap_or_default()
                 )}
                 // Favicon
+                {web_site_structured_data}
                 {props.head.clone()}
                 if let Some(content) = props.gallery.head_html.clone() {
                     {rich_text_html(&RichText{
@@ -400,7 +439,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                                         class={"breadcrumb breadcrumb_final"}
                                     >{breadcrumb.name.clone()}</span>
                                 }
-                            }).collect::<Vec<_>>(), &html!{{" » "}})}
+                            }).collect::<Vec<_>>(), &html!{{"»"}})}
                             if let Some(relative) = &props.relative {
                                 {format!(" ({}/{})", relative.index + 1, relative.count)}
                             }
@@ -417,6 +456,10 @@ pub fn app(props: AppProps<'_>) -> Html {
                                     })}
                                 }
                             }
+                            <form id="search_form" action="/search/" method="get">
+                                <input id="search_query" type="search" name="query" minlength={1}/>
+                                <button id="search_button" type="submit">{"Search"}</button>
+                            </form>
                         </nav>
                     </section>
                     <section id="main_and_sidebar">

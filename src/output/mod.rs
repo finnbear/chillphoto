@@ -1,7 +1,9 @@
-use crate::gallery::{CategoryPath, Gallery, Item, Order, Page, Photo};
+use crate::{
+    gallery::{CategoryPath, Gallery, Item, Order, Page, Photo},
+    output::search::render_search,
+};
 use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
-use serde::Serialize;
 use sitemap_rs::{
     image::Image,
     url::{ChangeFrequency, Url},
@@ -16,6 +18,7 @@ mod app;
 mod format;
 mod pwa;
 mod rich_text;
+mod search;
 mod serve;
 mod structured_data;
 
@@ -350,6 +353,30 @@ impl Gallery {
         }
 
         let page_items = page_items(self, &CategoryPath::ROOT);
+        {
+            let page_items = page_items.clone();
+            let root_og_image = root_og_image.clone();
+            ret_insert(
+                &mut ret,
+                self.config.search_html::<false>(),
+                LazyLock::new(Box::new(move || {
+                    render_html(AppProps {
+                        canonical: self.config.search_html::<true>(),
+                        gallery: self,
+                        title: format!("Search {}", self.config.title).into(),
+                        description: Some(format!("Search {}", self.config.title).into()),
+                        head: Default::default(),
+                        body: render_search(self),
+                        sidebar: Html::default(),
+                        pages: page_items,
+                        path: CategoryPath::ROOT.push("search".to_owned()),
+                        relative: None,
+                        og_image: root_og_image,
+                    })
+                })),
+            );
+        }
+
         for chunk in paginate(&self.children, self.config.items_per_page) {
             let page_items = page_items.clone();
             let root_og_image = root_og_image.clone();
@@ -357,38 +384,6 @@ impl Gallery {
                 &mut ret,
                 self.config.index_html::<false>(chunk.index),
                 LazyLock::new(Box::new(move || {
-                    /// https://schema.org/WebSite
-                    #[derive(Serialize)]
-                    struct WebSiteStructuredData {
-                        #[serde(rename = "@type")]
-                        _type: &'static str,
-                        #[serde(skip_serializing_if = "Option::is_none")]
-                        url: Option<String>,
-                        name: String,
-                        #[serde(rename = "abstract", skip_serializing_if = "Option::is_none")]
-                        description: Option<String>,
-                        #[serde(
-                            rename = "copyrightHolder",
-                            skip_serializing_if = "Option::is_none"
-                        )]
-                        copyright_holder: Option<PersonStructuredData>,
-                    }
-
-                    let website_structured_data = (chunk.index == 0).then(|| {
-                        write_structured_data(WebSiteStructuredData {
-                            _type: "WebSite",
-                            url: self.config.root_url.clone(),
-                            name: self.config.title.clone(),
-                            description: self.config.description.clone(),
-                            copyright_holder: self.config.author.clone().map(|name| {
-                                PersonStructuredData {
-                                    _type: "Person",
-                                    name,
-                                }
-                            }),
-                        })
-                    });
-
                     let mut title = self.config.title.clone();
                     if chunk.index != 0 {
                         write!(title, " (page {})", chunk.index + 1).unwrap();
@@ -399,7 +394,7 @@ impl Gallery {
                         gallery: self,
                         title: title.into(),
                         description: self.config.description.clone().map(|d| d.into()),
-                        head: website_structured_data.unwrap_or_default(),
+                        head: Default::default(),
                         body: html! {<>
                             {render_items(self, &CategoryPath::ROOT, chunk.items)}
                             if let Some(text) = &self.home_text {
