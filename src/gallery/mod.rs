@@ -1,17 +1,24 @@
-use chrono::NaiveDate;
 use image::RgbImage;
 use std::sync::OnceLock;
 
+mod category;
 mod category_path;
 mod config;
 mod exif;
+mod item;
+mod page;
 mod photo;
+mod rich_text;
 mod static_file;
 
+pub use category::*;
 pub use category_path::*;
 pub use config::*;
 pub use exif::*;
+pub use item::*;
+pub use page::*;
 pub use photo::*;
+pub use rich_text::*;
 pub use static_file::*;
 
 #[derive(Debug)]
@@ -177,150 +184,4 @@ pub fn visit_children_items_mut(
             visit_children_items_mut(&path, &mut category.children, visitor);
         }
     }
-}
-
-#[derive(Debug)]
-pub enum Item {
-    Category(Category),
-    Photo(Photo),
-    Page(Page),
-}
-
-impl Item {
-    pub fn photo(&self) -> Option<&Photo> {
-        if let Self::Photo(photo) = self {
-            Some(photo)
-        } else {
-            None
-        }
-    }
-
-    pub fn category(&self) -> Option<&Category> {
-        if let Self::Category(category) = self {
-            Some(category)
-        } else {
-            None
-        }
-    }
-
-    pub fn category_mut(&mut self) -> Option<&mut Category> {
-        if let Self::Category(category) = self {
-            Some(category)
-        } else {
-            None
-        }
-    }
-
-    pub fn page(&self) -> Option<&Page> {
-        if let Self::Page(page) = self {
-            Some(page)
-        } else {
-            None
-        }
-    }
-
-    pub fn slug(&self) -> String {
-        match self {
-            Self::Category(category) => category.slug(),
-            Self::Photo(photo) => photo.slug(),
-            Self::Page(page) => page.slug(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Category {
-    pub name: String,
-    pub text: Option<RichText>,
-    pub children: Vec<Item>,
-    pub config: CategoryConfig,
-    /// foo/bar baz/Quxx
-    pub src_key: String,
-}
-
-impl Category {
-    pub fn slug(&self) -> String {
-        self.config
-            .slug
-            .clone()
-            .unwrap_or_else(|| self.name.to_lowercase().replace(' ', "-"))
-    }
-
-    pub fn thumbnail(&self, path: &CategoryPath) -> Option<(CategoryPath, &Photo)> {
-        let mut ret = Option::<(CategoryPath, &Photo)>::None;
-        self.visit_items(&path, |path, item| match item {
-            Item::Photo(photo) => {
-                if ret.is_none() || self.config.thumbnail.as_ref() == Some(&photo.name) {
-                    ret = Some((path.clone(), photo));
-                }
-            }
-            Item::Category(category) => {
-                if ret.is_none() || self.config.thumbnail.as_ref() == Some(&category.name) {
-                    ret = category.thumbnail(path);
-                }
-            }
-            _ => {}
-        });
-        ret
-    }
-
-    pub fn first_and_last_dates(&self) -> Option<(NaiveDate, NaiveDate)> {
-        let mut first_date = Option::<NaiveDate>::None;
-        let mut last_date = Option::<NaiveDate>::None;
-
-        self.visit_items(&CategoryPath::ROOT, |_, child| {
-            if let Item::Photo(photo) = child {
-                if let Some(date_time) = photo.date_time() {
-                    let date = date_time.date();
-                    if first_date.map(|fd| date < fd).unwrap_or(true) {
-                        first_date = Some(date);
-                    }
-                    if last_date.map(|fd| date > fd).unwrap_or(true) {
-                        last_date = Some(date);
-                    }
-                }
-            }
-        });
-
-        first_date.zip(last_date)
-    }
-
-    pub fn visit_items<'a>(
-        &'a self,
-        path: &CategoryPath,
-        mut visitor: impl FnMut(&CategoryPath, &'a Item),
-    ) {
-        let path = path.push(self.slug());
-        visit_children_items(&path, &self.children, &mut visitor);
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct RichText {
-    pub content: String,
-    pub format: RichTextFormat,
-}
-
-#[derive(Debug)]
-pub struct Page {
-    pub name: String,
-    pub text: RichText,
-    pub config: PageConfig,
-    pub src_key: String,
-}
-
-impl Page {
-    pub fn slug(&self) -> String {
-        self.config
-            .slug
-            .clone()
-            .unwrap_or_else(|| self.name.to_lowercase().replace(' ', "-"))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RichTextFormat {
-    PlainText,
-    Markdown,
-    Html,
 }
