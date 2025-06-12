@@ -1,5 +1,5 @@
+use crate::gallery::Order;
 use crate::image_ai::init_image_ai;
-use crate::output::Order;
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use gallery::CategoryPath;

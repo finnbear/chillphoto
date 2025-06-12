@@ -19,6 +19,24 @@ pub fn remove_dir_contents<P: AsRef<Path>>(path: P) -> io::Result<()> {
     Ok(())
 }
 
+// TODO: wait for `slice_concat_ext` stabilization.
+pub fn join<T: Clone>(slice: &[T], sep: &T) -> Vec<T> {
+    let mut iter = slice.iter();
+    let first = match iter.next() {
+        Some(first) => first,
+        None => return vec![],
+    };
+    let size = slice.len() * 2 - 1;
+    let mut result = Vec::with_capacity(size);
+    result.extend_from_slice(std::slice::from_ref(first));
+
+    for v in iter {
+        result.push(sep.clone());
+        result.extend_from_slice(std::slice::from_ref(v))
+    }
+    result
+}
+
 pub fn add_trailing_slash_if_nonempty(path: &str) -> String {
     if path.is_empty() {
         String::new()
