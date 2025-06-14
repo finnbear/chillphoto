@@ -10,7 +10,13 @@ use sitemap_rs::{
     url_builder::UrlBuilder,
     url_set::UrlSet,
 };
-use std::{collections::HashMap, fmt::Write, fs, io::Cursor, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+    fs,
+    io::Cursor,
+    sync::LazyLock,
+};
 use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{html, Html};
 
@@ -447,8 +453,33 @@ impl Gallery {
                     sitemap.push(page);
                 }
             }
+
+            // add some search queries to sitemap
+            if let Some(root_url) = &self.config.root_url {
+                let mut locations = HashSet::<&str>::new();
+                self.visit_items(|_, item| {
+                    if let Item::Photo(photo) = item {
+                        if let Some(location) = &photo.config.location {
+                            locations.insert(location);
+                        }
+                    }
+                });
+
+                for location in locations {
+                    let page = Url::builder(format!(
+                        "{root_url}/search/?query={}",
+                        location.replace(" ", "+")
+                    ))
+                    .change_frequency(ChangeFrequency::Weekly)
+                    .build()
+                    .unwrap();
+                    sitemap.push(page);
+                }
+            }
+
             sitemap.sort_by_key(|url| {
                 (
+                    url.location.contains("/?query="),
                     url.location.chars().filter(|c| *c == '/').count(),
                     url.location.clone(),
                 )

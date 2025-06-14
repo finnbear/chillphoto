@@ -36,6 +36,7 @@ for (const item of items) {
         }
     }
     eat(item.description);
+    eat(item.location);
     eat(item.pageTextContent);
     eat(item.month);
     eat(item.year);
