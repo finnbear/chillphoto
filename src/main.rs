@@ -350,10 +350,29 @@ fn main() {
         }
     });
 
-    gallery.children.sort_by_key(Order::new);
+    fn sort_and_make_photo_names_distinct(items: &mut [Item]) {
+        items.sort_by_key(Order::new);
+        let mut indices = HashMap::<String, usize>::new();
+        for item in items.iter_mut().rev() {
+            let photo = if let Item::Photo(photo) = item {
+                photo
+            } else {
+                continue;
+            };
+
+            let name = photo.output_name();
+            let index = indices.entry(name.to_owned()).or_default();
+            *index += 1;
+            if *index > 1 {
+                photo.config.rename = Some(format!("{name} {index}"));
+            }
+        }
+    }
+
+    sort_and_make_photo_names_distinct(&mut gallery.children);
     gallery.visit_items_mut(|_, item| match item {
         Item::Category(category) => {
-            category.children.sort_by_key(Order::new);
+            sort_and_make_photo_names_distinct(&mut category.children);
         }
         _ => {}
     });
