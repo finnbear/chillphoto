@@ -38,7 +38,7 @@ impl Order {
             Item::Photo(photo) => Self::Photo {
                 order: Reverse(photo.config.order),
                 date: Reverse(photo.date_time()),
-                name: photo.name.clone(),
+                name: photo.output_name().to_owned(),
             },
             Item::Page(page) => Self::new_page(page),
         }

@@ -352,7 +352,15 @@ fn main() {
     });
 
     fn sort_and_make_photo_names_distinct(items: &mut [Item]) {
-        items.sort_by_key(Order::new);
+        // Don't let user-defined order change distinct names.
+        items.sort_by_key(|item| {
+            if let Item::Photo(photo) = item {
+                Some((std::cmp::Reverse(photo.date_time()), photo.name.clone()))
+            } else {
+                None
+            }
+        });
+
         let mut indices = HashMap::<String, usize>::new();
         for item in items.iter_mut().rev() {
             let photo = if let Item::Photo(photo) = item {
@@ -368,6 +376,8 @@ fn main() {
                 photo.distinct_name = Some(format!("{name} {index}"));
             }
         }
+
+        items.sort_by_key(Order::new);
     }
 
     sort_and_make_photo_names_distinct(&mut gallery.children);
