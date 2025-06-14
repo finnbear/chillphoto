@@ -249,6 +249,7 @@ fn main() {
             file_date: metadata.modified().or(metadata.created()).ok(),
             src_key: path_no_extension,
             parsed_config_date: None,
+            distinct_name: None,
         };
 
         let to_insert = gallery
@@ -364,7 +365,7 @@ fn main() {
             let index = indices.entry(name.to_owned()).or_default();
             *index += 1;
             if *index > 1 {
-                photo.config.rename = Some(format!("{name} {index}"));
+                photo.distinct_name = Some(format!("{name} {index}"));
             }
         }
     }

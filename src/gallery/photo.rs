@@ -21,12 +21,16 @@ pub struct Photo {
     pub file_date: Option<SystemTime>,
     pub parsed_config_date: Option<NaiveDate>,
     pub config: PhotoConfig,
+    pub distinct_name: Option<String>,
     pub src_key: String,
 }
 
 impl Photo {
     pub fn output_name(&self) -> &str {
-        self.config.rename.as_deref().unwrap_or(&self.name)
+        self.distinct_name
+            .as_deref()
+            .or(self.config.rename.as_deref())
+            .unwrap_or(&self.name)
     }
 
     pub fn slug(&self) -> String {
