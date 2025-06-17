@@ -3,6 +3,16 @@ const items = [...INPUT_ITEMS];
 const urlSearchParams = new URLSearchParams(window.location.search);
 const query = urlSearchParams.get('query') || "";
 
+if (query) {
+    let linkCanonical = Array.from(document.getElementsByTagName("link")).filter(e => e.rel == 'canonical')[0];
+
+    if (linkCanonical) {
+        linkCanonical.href += window.location.search;
+    }
+    let title = document.getElementsByTagName("title")[0];
+    title.innerText = `${query} | ${title.innerText}`
+}
+
 const searchQuery = document.getElementById("search_query");
 searchQuery.value = query;
 
@@ -76,7 +86,6 @@ if (filteredItems.length > MAX) {
 }
 
 const searchResultsContainer = document.getElementById("page_main_body_search_results");
-
 
 while (searchResultsContainer.hasChildNodes()) {
     searchResultsContainer.removeChild(searchResultsContainer.lastChild);
