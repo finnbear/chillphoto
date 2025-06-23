@@ -1,5 +1,6 @@
 use crate::gallery::Order;
 use crate::image_ai::init_image_ai;
+use crate::util::recursively_remove_empty_dirs_of_contents;
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use gallery::CategoryPath;
@@ -14,6 +15,8 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use std::collections::HashMap;
 use std::fs;
 use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use toml_edit::DocumentMut;
@@ -84,6 +87,8 @@ enum Command {
     Serve,
     /// Build static gallery website.
     Build,
+    /// Clear the output directory.
+    Clean,
 }
 
 fn main() {
@@ -113,6 +118,13 @@ fn main() {
     let config_text =
         fs::read_to_string("./chillphoto.toml").expect("couldn't read ./chillphoto.toml");
     let config = toml::from_str::<GalleryConfig>(&config_text).unwrap();
+
+    if matches!(args.command, Command::Clean) {
+        if fs::exists(&config.output).unwrap() {
+            remove_dir_contents(&config.output).expect("failed to clear output directory");
+        }
+        return;
+    }
 
     let mut input_path_string = config.input.clone();
     if let Some(remainder) = input_path_string.strip_prefix("~/") {
@@ -462,26 +474,68 @@ fn main() {
             )
             .with_elapsed(start.elapsed());
 
-        if fs::exists(&gallery.config.output).unwrap() {
-            remove_dir_contents(&gallery.config.output).expect("failed to clear output directory");
-        }
+        let reused = AtomicUsize::new(0);
+        let total = AtomicUsize::new(0);
+        let mut removals = 0usize;
 
-        output.par_iter().for_each(|(path, generator)| {
-            let path = gallery.config.subdirectory(path.strip_prefix('/').unwrap());
-            let contents = &**generator;
-            if let Some((dir, _)) = path.rsplit_once('/') {
-                std::fs::create_dir_all(dir).unwrap();
+        // Remove obsolete files.
+        for file in Glob::new("**").unwrap().walk(&gallery.config.output) {
+            let file = file.unwrap();
+            if !file.file_type().is_file() {
+                continue;
             }
-            std::fs::write(path, contents).unwrap();
+            let path = format!("/{}", file.matched().complete());
+            if output.get(&path).is_none() {
+                //println!("removing obsolete {path}");
+                fs::remove_file(file.path()).unwrap();
+                removals += 1;
+            }
+        }
+        recursively_remove_empty_dirs_of_contents(&gallery.config.output).unwrap();
+
+        output.par_iter().for_each(|(path, (generator, hasher))| {
+            let path = gallery.config.subdirectory(path.strip_prefix('/').unwrap());
+
+            let new_hash = hasher.as_ref().map(|hasher| (&**hasher).as_bytes());
+
+            let mut reuse = false;
+            if let Some(new_hash) = new_hash {
+                if fs::exists(&path).unwrap() {
+                    if let Ok(Some(old_hash)) = fsquirrel::get(&path, "chillphotohash") {
+                        if old_hash == new_hash {
+                            reuse = true;
+                        }
+                    }
+                }
+
+                total.fetch_add(1, Ordering::Relaxed);
+                if reuse {
+                    reused.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            if !reuse {
+                let contents = &**generator;
+                if let Some((dir, _)) = path.rsplit_once('/') {
+                    std::fs::create_dir_all(dir).unwrap();
+                }
+                std::fs::write(&path, contents).unwrap();
+                if let Some(new_hash) = new_hash {
+                    fsquirrel::set(&path, "chillphotohash", new_hash).unwrap();
+                }
+            }
+
             progress.inc(1);
         });
 
         progress.finish_and_clear();
 
         println!(
-            "({:.1}s) Saved website to {}",
+            "({:.1}s) Saved website to {}, reusing {}/{} images files, removed {removals} obsolete files",
             start.elapsed().as_secs_f32(),
-            gallery.config.output
+            gallery.config.output,
+            reused.load(Ordering::Relaxed),
+            total.load(Ordering::Relaxed),
         );
     }
 }

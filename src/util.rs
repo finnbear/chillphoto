@@ -19,6 +19,36 @@ pub fn remove_dir_contents<P: AsRef<Path>>(path: P) -> io::Result<()> {
     Ok(())
 }
 
+pub fn recursively_remove_empty_dirs_of_contents<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    pub fn recursively_remove_empty_dirs<P: AsRef<Path>>(path: P) -> io::Result<bool> {
+        let mut keep = false;
+        for entry in fs::read_dir(&path)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if entry.file_type()?.is_dir() {
+                keep |= recursively_remove_empty_dirs(path)?;
+            } else {
+                keep = true;
+            }
+        }
+        if !keep {
+            fs::remove_dir(&path).unwrap();
+        }
+        Ok(keep)
+    }
+
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if entry.file_type()?.is_dir() {
+            recursively_remove_empty_dirs(path)?;
+        }
+    }
+    Ok(())
+}
+
 // TODO: wait for `slice_concat_ext` stabilization.
 pub fn join<T: Clone>(slice: &[T], sep: &T) -> Vec<T> {
     let mut iter = slice.iter();

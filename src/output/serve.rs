@@ -13,9 +13,11 @@ use std::{
     time::Duration,
 };
 
+use crate::output::DynLazy;
+
 pub fn serve(
     start: Instant,
-    output: &HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + '_>>>,
+    output: &HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
 ) {
     let background_threads = &AtomicUsize::new(0);
     let http_threads = &AtomicUsize::new(0);
@@ -33,7 +35,7 @@ pub fn serve(
             let _guard = Guard::new(background_threads);
             scope.spawn(move || {
                 let _guard = _guard;
-                while let Some((_, i)) = {
+                while let Some((_, (i, _))) = {
                     let next = work.lock().unwrap().next();
                     next
                 } {
@@ -127,18 +129,21 @@ pub fn serve(
                     }
                 }
 
-                let response = if let Some(file) = output.get(&path) {
+                let response = if let Some((file, hasher)) = output.get(&path) {
                     while http_threads.load(Ordering::SeqCst) >= available_parallelism {
                         std::thread::sleep(Duration::from_secs(50));
                     }
 
                     let _guard = Guard::new(http_threads);
 
-                    http::Response::builder()
+                    let mut builder = http::Response::builder()
                         .version(request.version())
-                        .status(200)
-                        .body((&***file).to_vec())
-                        .unwrap()
+                        .status(200);
+
+                    if let Some(hasher) = hasher {
+                        builder = builder.header("Etag", (&***hasher).to_owned());
+                    }
+                    builder.body((&***file).to_vec()).unwrap()
                 } else {
                     http::Response::builder()
                         .version(request.version())

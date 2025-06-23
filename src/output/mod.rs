@@ -1,6 +1,7 @@
 use crate::{
-    gallery::{CategoryPath, Gallery, Item, Order, Page, Photo},
+    gallery::{CategoryPath, Gallery, GalleryConfig, Item, Order, Page, Photo},
     output::search::render_search,
+    util::checksum,
 };
 use chrono::Datelike;
 use image::{ImageFormat, RgbImage};
@@ -15,7 +16,7 @@ use std::{
     fmt::Write,
     fs,
     io::Cursor,
-    sync::LazyLock,
+    sync::{Arc, LazyLock},
 };
 use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{html, Html};
@@ -34,6 +35,8 @@ pub use pwa::*;
 pub use rich_text::*;
 pub use serve::*;
 pub use structured_data::*;
+
+pub type DynLazy<'a, T> = LazyLock<T, Box<dyn FnOnce() -> T + Send + Sync + 'a>>;
 
 fn page_items<'a>(gallery: &'a Gallery, path: &CategoryPath) -> Vec<(String, &'a Page)> {
     let mut ret: Vec<(String, &'a Page)> = path
@@ -55,22 +58,20 @@ fn page_items<'a>(gallery: &'a Gallery, path: &CategoryPath) -> Vec<(String, &'a
 impl Gallery {
     pub fn output<'a>(
         &'a self,
-    ) -> HashMap<String, LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>> {
+    ) -> HashMap<String, (DynLazy<'a, Vec<u8>>, Option<DynLazy<'a, String>>)> {
         let config = &self.config;
 
-        let mut ret = HashMap::<
-            String,
-            LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
-        >::new();
+        let mut ret = HashMap::<String, (DynLazy<'a, Vec<u8>>, Option<DynLazy<'a, String>>)>::new();
         fn ret_insert<'a>(
-            ret: &mut HashMap<
-                String,
-                LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
-            >,
+            ret: &mut HashMap<String, (DynLazy<'a, Vec<u8>>, Option<DynLazy<'a, String>>)>,
             path: String,
-            file: LazyLock<Vec<u8>, Box<dyn FnOnce() -> Vec<u8> + Send + Sync + 'a>>,
+            file: DynLazy<'a, Vec<u8>>,
+            hash: Option<DynLazy<'a, String>>,
         ) {
-            assert!(ret.insert(path.clone(), file).is_none(), "duplicate {path}");
+            assert!(
+                ret.insert(path.clone(), (file, hash)).is_none(),
+                "duplicate {path}"
+            );
         }
         let mut sitemap = Vec::<Url>::new();
 
@@ -101,12 +102,43 @@ impl Gallery {
                     }
                     let photo_index = photo_index.unwrap();
                     let photo_path = config.photo::<false>(&path, &photo.slug());
-                    let xmp = Some((self, photo));
+                    let xmp = Some((&self.config, photo));
+
+                    // Hashing this is expensive so do it once for image, preview, and thumbnail.
+                    let input_image_data_hash = Arc::new(LazyLock::new(|| {
+                        checksum(&photo.input_image_data)
+                    }));
+
+                    let hash_factory  = |key: &'static str| -> DynLazy<'a, String> {
+                        let input_image_data_hash = Arc::clone(&input_image_data_hash);
+                        LazyLock::new(Box::new(move || {
+                            /// Edit this when there is a breaking change.
+                            const BREAKING_CHANGE : usize = 0;
+                            let to_hash = format!(
+                                "{:?}{key:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{BREAKING_CHANGE}",
+                                **input_image_data_hash,
+                                self.config,
+                                photo.config,
+                                photo.distinct_name,
+                                photo.exif,
+                                photo.file_date,
+                                photo.name,
+                                photo.output_name(),
+                                photo.date_time(),
+                                photo.slug(),
+                                photo.src_key,
+                                photo.text
+                            );
+                            checksum(to_hash.as_bytes())
+                        }))
+                    };
+
                     ret_insert(&mut ret,
                         photo_path.clone(),
                         LazyLock::new(Box::new(move || {
                             write_image(photo.image(&self.config), &photo_path, xmp)
                         })),
+                        Some(hash_factory("image")),
                     );
                     let preview_path = config.preview::<false>(&path, &photo.slug());
                     ret_insert(&mut ret,
@@ -114,6 +146,7 @@ impl Gallery {
                         LazyLock::new(Box::new(move || {
                             write_image(photo.preview(&self.config), &preview_path, xmp)
                         })),
+                        Some(hash_factory("preview")),
                     );
                     let thumbnail_path = config.thumbnail::<false>(&path, &photo.slug());
                     ret_insert(&mut ret,
@@ -121,6 +154,7 @@ impl Gallery {
                         LazyLock::new(Box::new(move || {
                             write_image(photo.thumbnail(&self.config), &thumbnail_path, xmp)
                         })),
+                        Some(hash_factory("thumbnail")),
                     );
 
                     let canonical = config.photo_html::<true>(&path, &photo.slug());
@@ -255,6 +289,7 @@ impl Gallery {
                                 og_image: Some((self.config.preview::<true>(&path, &photo.slug()), photo.preview_dimensions(&self.config))),
                             })
                         })),
+                        None
                     );
                 }
                 Item::Category(category) => {
@@ -297,6 +332,7 @@ impl Gallery {
                                     og_image: category.thumbnail(&path).map(|(path, preview)| (self.config.preview::<true>(&path, &preview.slug()), preview.preview_dimensions(&self.config)))
                                 })
                             })),
+                            None,
                         );
                     };
                 }
@@ -320,6 +356,7 @@ impl Gallery {
                                 og_image: root_thumbnail,
                             })
                         })),
+                        None
                     );
                 }
             }
@@ -333,6 +370,7 @@ impl Gallery {
                 LazyLock::new(Box::new(move || {
                     write_image(self.favicon().unwrap(), &favicon_path, None)
                 })),
+                None,
             );
         }
 
@@ -341,6 +379,7 @@ impl Gallery {
             &mut ret,
             manifest_path.clone(),
             LazyLock::new(Box::new(move || write_manifest(self))),
+            None,
         );
 
         if let Some((_, thumbnail)) = self.thumbnail() {
@@ -355,6 +394,7 @@ impl Gallery {
                         None,
                     )
                 })),
+                None,
             );
         }
 
@@ -380,6 +420,7 @@ impl Gallery {
                         og_image: root_og_image,
                     })
                 })),
+                None,
             );
         }
 
@@ -421,6 +462,7 @@ impl Gallery {
                         og_image: root_og_image.clone(),
                     })
                 })),
+                None,
             );
         }
 
@@ -493,6 +535,7 @@ impl Gallery {
                     sitemap.write(&mut ret).unwrap();
                     ret
                 })),
+                None,
             );
         }
 
@@ -511,6 +554,7 @@ impl Gallery {
                 }
                 robots_txt.into_bytes()
             })),
+            None,
         );
 
         for file in &self.static_files {
@@ -518,6 +562,7 @@ impl Gallery {
                 &mut ret,
                 file.path.clone(),
                 LazyLock::new(Box::new(move || file.contents.clone())),
+                None,
             );
         }
 
@@ -641,12 +686,12 @@ fn render_items(gallery: &Gallery, category_path: &CategoryPath, items: &[Item])
     }
 }
 
-pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) -> Vec<u8> {
+pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&GalleryConfig, &Photo)>) -> Vec<u8> {
     let mut ret = Cursor::new(Vec::new());
     let format = ImageFormat::from_path(path).unwrap();
     img.write_to(&mut ret, format).unwrap();
     let mut buf = ret.into_inner();
-    if let Some((gallery, photo)) = xmp {
+    if let Some((config, photo)) = xmp {
         // Awaiting https://github.com/adobe/xmp-toolkit-rs/issues/265
         let file = tempfile::Builder::new()
             .suffix(&format!(".xmp.{}", format.extensions_str()[0]))
@@ -682,7 +727,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) 
             .config
             .author
             .clone()
-            .or_else(|| gallery.config.author.clone());
+            .or_else(|| config.author.clone());
         let copyright_year = photo.date_time().map(|d| d.year());
 
         if let Some(copyright_notice) = copyright_notice(author.as_deref(), copyright_year) {
@@ -709,7 +754,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) 
             .config
             .license_url
             .clone()
-            .or_else(|| gallery.config.license_url.clone())
+            .or_else(|| config.license_url.clone())
         {
             xmp.set_property(
                 xmp_ns::XMP_RIGHTS,
@@ -718,7 +763,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) 
             )
             .unwrap();
         }
-        if let Some(licensor_url) = gallery.config.root_url.clone() {
+        if let Some(licensor_url) = config.root_url.clone() {
             xmp.set_struct_field(
                 "http://ns.useplus.org/ldf/xmp/1.0/",
                 "plus:Licensor",
@@ -729,7 +774,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&Gallery, &Photo)>) 
             .unwrap();
         }
 
-        if gallery.config.disallow_ai_training {
+        if config.disallow_ai_training {
             xmp.set_property(
                 "http://ns.useplus.org/ldf/xmp/1.0/",
                 "plus:DataMining",

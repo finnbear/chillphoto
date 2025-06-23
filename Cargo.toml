@@ -12,6 +12,7 @@ async-openai = "0.28.1"
 base64 = "0.22.1"
 chrono = "0.4.40"
 clap = { version = "4.5.34", features = ["derive"] }
+fsquirrel = "0.1.0"
 futures = "0.3.31"
 genpdfi = "0.2.1"
 http = "1.3.1"

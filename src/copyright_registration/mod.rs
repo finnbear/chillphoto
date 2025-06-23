@@ -98,7 +98,7 @@ impl Gallery {
             let image_bytes = write_image(
                 submission.photo.image(&self.config),
                 &submission.filename,
-                Some((&self, submission.photo)),
+                Some((&self.config, submission.photo)),
             );
             archive.write_all(&image_bytes).unwrap();
             let date = submission.date_time.date();

@@ -153,6 +153,7 @@ unlisted = true
 - [x] Pagination
 - [x] Search box
 - [x] Generate US Copyright Office group registration ZIP files
+- [x] Build faster by re-using previous output
 - [ ] 404 page
 - [ ] Hot-reloading
 - [ ] Diagnostics and error handling
