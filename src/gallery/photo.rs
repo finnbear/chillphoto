@@ -1,7 +1,6 @@
 use crate::{
-    gallery::ExifData,
-    gallery::RichText,
-    gallery::{GalleryConfig, PhotoConfig},
+    gallery::{ExifData, GalleryConfig, PhotoConfig, RichText},
+    util::is_camera_file_name,
 };
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use image::{
@@ -37,7 +36,7 @@ impl Photo {
         self.config.slug.clone().unwrap_or_else(|| {
             {
                 let name = self.output_name();
-                if name.starts_with("IMG") || name.starts_with("DSC") {
+                if is_camera_file_name(name) {
                     name.to_owned()
                 } else {
                     name.to_lowercase()

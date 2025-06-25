@@ -1,5 +1,6 @@
 use crate::{
-    gallery::CategoryPath, gallery::Gallery, gallery::GalleryConfig, gallery::Photo, util::checksum,
+    gallery::{CategoryPath, Gallery, GalleryConfig, Photo},
+    util::{checksum, is_camera_file_name},
 };
 use async_openai::types::{
     ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
@@ -26,6 +27,9 @@ use toml_edit::DocumentMut;
 
 pub fn init_image_ai(gallery: &Gallery, path: &CategoryPath, photo: &Photo, doc: &mut DocumentMut) {
     let mut prompt = String::new();
+    if !is_camera_file_name(&photo.output_name()) {
+        writeln!(prompt, "The photo's filename is: {}.", photo.output_name()).unwrap();
+    }
     if path.is_root() {
         writeln!(
             prompt,

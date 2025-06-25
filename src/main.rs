@@ -165,6 +165,9 @@ fn main() {
 
     entries.into_par_iter().for_each(|entry| {
         let entry = entry.unwrap();
+        if !entry.file_type().is_file() {
+            return;
+        }
         let entire_path = entry.matched().complete().to_owned();
         let (category_names, categories, except_name, name) =
             if let Some((categories, name)) = entire_path.rsplit_once('/') {

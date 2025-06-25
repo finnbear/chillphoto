@@ -78,3 +78,7 @@ pub fn add_trailing_slash_if_nonempty(path: &str) -> String {
 pub fn checksum(b: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD_NO_PAD.encode(&md5::compute(b).0)
 }
+
+pub fn is_camera_file_name(name: &str) -> bool {
+    name.starts_with("IMG") || name.starts_with("DSC")
+}
