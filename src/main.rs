@@ -410,39 +410,49 @@ fn main() {
     );
 
     if let Command::Init { photos, image_ai } = &args.command {
+        let mut jobs = Vec::new();
         gallery.visit_items(|path, item| {
             if let Some(photo) = item.photo() {
                 if !*photos && !*image_ai {
                     return;
                 }
-
-                let mut config_path = root.clone();
-                for path in path.iter_paths().skip(1) {
-                    config_path.push(&gallery.category(&path).unwrap().name);
-                }
-                config_path.push(format!("{}.toml", photo.name));
-
-                let mut file = fs::OpenOptions::new()
-                    .read(true)
-                    .create(true)
-                    .write(true)
-                    .open(&config_path)
-                    .unwrap();
-                file.seek(std::io::SeekFrom::Start(0)).unwrap();
-                let mut existing = String::new();
-                file.read_to_string(&mut existing).unwrap();
-                let mut doc = existing.parse::<DocumentMut>().unwrap();
-
-                if *image_ai {
-                    init_image_ai(&gallery, &path, photo, &mut doc);
-                }
-
-                file.seek(SeekFrom::Start(0)).unwrap();
-                file.set_len(0).unwrap();
-                file.write_all(doc.to_string().as_bytes()).unwrap();
-                file.sync_data().unwrap();
+                jobs.push((path.to_owned(), photo));
             }
         });
+
+        let each = |(path, photo): (CategoryPath, &Photo)| {
+            let mut config_path = root.clone();
+            for path in path.iter_paths().skip(1) {
+                config_path.push(&gallery.category(&path).unwrap().name);
+            }
+            config_path.push(format!("{}.toml", photo.name));
+
+            let mut file = fs::OpenOptions::new()
+                .read(true)
+                .create(true)
+                .write(true)
+                .open(&config_path)
+                .unwrap();
+            file.seek(std::io::SeekFrom::Start(0)).unwrap();
+            let mut existing = String::new();
+            file.read_to_string(&mut existing).unwrap();
+            let mut doc = existing.parse::<DocumentMut>().unwrap();
+
+            if *image_ai {
+                init_image_ai(&gallery, &path, photo, &mut doc);
+            }
+
+            file.seek(SeekFrom::Start(0)).unwrap();
+            file.set_len(0).unwrap();
+            file.write_all(doc.to_string().as_bytes()).unwrap();
+            file.sync_data().unwrap();
+        };
+        if gallery.config.image_ai_api_key.is_some() {
+            jobs.into_par_iter().for_each(each);
+        } else {
+            // AI is local, so avoid exausting local resources.
+            jobs.into_iter().for_each(each);
+        }
         return;
     }
 
