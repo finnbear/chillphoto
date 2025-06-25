@@ -21,6 +21,7 @@ pub struct AppProps<'a> {
     pub sidebar: Html,
     pub pages: Vec<(String, &'a Page)>,
     pub relative: Option<RelativeNavigation>,
+    pub index: bool,
 }
 
 pub fn app(props: AppProps<'_>) -> Html {
@@ -331,6 +332,16 @@ pub fn app(props: AppProps<'_>) -> Html {
             }),
         });
 
+    let mut robots_meta = if props.index {
+        "index,follow".to_owned()
+    } else {
+        "noindex".to_owned()
+    };
+
+    if props.gallery.config.disallow_ai_training {
+        robots_meta.push_str(",DisallowAITraining,noai,noimageai");
+    }
+
     html! {
         <html lang="en">
             <head>
@@ -352,9 +363,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                 if props.gallery.favicon.is_some() {
                     <link rel="icon" type="image/png" href="/favicon.png"/>
                 }
-                if props.gallery.config.disallow_ai_training {
-                    <meta name="robots" content="index,follow,DisallowAITraining,noai,noimageai"/>
-                }
+                <meta name="robots" content={robots_meta}/>
                 <link rel="manifest" href="/manifest.json"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 <meta property="og:type" content="website" />

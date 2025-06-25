@@ -106,20 +106,6 @@ for (const result of filteredItems) {
     searchResultsContainer.appendChild(searchResultContainer);
 }
 
-if (resultCount == 0) {
-    let metaRobots = Array.from(document.getElementsByTagName("meta")).filter(e => e.name == 'robots')[0];
-
-    if (!metaRobots) {
-        metaRobots = document.createElement('meta');
-        metaRobots.name = 'robots';
-        document.head.appendChild(metaRobots);
-    }
-
-    metaRobots.content = ["noindex"].concat(
-        metaRobots.content.split(",").filter(d => d != "index")
-    ).join(",");
-}
-
 const pageMainBody = document.getElementById("page_main_body");
 const summary = document.createElement("p");
 summary.innerText = `Found ${resultCount} ${resultCount == 1 ? "result" : "results"}${truncated ? ", showing top " + MAX : ""}.`
