@@ -58,13 +58,25 @@ pub fn app(props: AppProps<'_>) -> Html {
         }
 
         #page {
-            background-color: white;;
+            background-color: white;
             max-width: 60rem;
             margin: 0rem auto;
             display: flex;
             flex-direction: column;
             border-radius: 0.5rem;
             overflow: hidden;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                margin: 0;
+            }
+
+            #page {
+                border-radius: 0;
+                margin: 0;
+                max-width: initial;
+            }
         }
 
         #header, #footer {

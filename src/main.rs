@@ -532,6 +532,7 @@ fn main() {
                 if let Some((dir, _)) = path.rsplit_once('/') {
                     std::fs::create_dir_all(dir).unwrap();
                 }
+                let _ = fsquirrel::remove(&path, "chillphotohash");
                 std::fs::write(&path, contents).unwrap();
                 if let Some(new_hash) = new_hash {
                     fsquirrel::set(&path, "chillphotohash", new_hash).unwrap();
