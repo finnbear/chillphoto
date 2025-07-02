@@ -437,6 +437,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                                             "relative_navigation_previous",
                                             relative.previous.is_none().then_some("relative_navigation_unavailable"),
                                         )}
+                                        aria-disabled={relative.previous.is_none().then_some("true")}
                                     >{"Previous"}</a>
                                     <a
                                         href={relative.next.clone()}
@@ -444,11 +445,12 @@ pub fn app(props: AppProps<'_>) -> Html {
                                             "relative_navigation_previous",
                                             relative.next.is_none().then_some("relative_navigation_unavailable"),
                                         )}
+                                        aria-disabled={relative.next.is_none().then_some("true")}
                                     >{"Next"}</a>
                                 </div>
                             }
                         </header>
-                        <nav id="breadcrumbs" data-nosnippet={"nosnippet"}>
+                        <nav id="breadcrumbs" aria-label="Breadcrumb" data-nosnippet={"nosnippet"}>
                             {join(&breadcrumbs.iter().map(|breadcrumb| html!{
                                 if let Some(href) = &breadcrumb.item {
                                     <a
@@ -458,6 +460,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                                 } else {
                                     <span
                                         class={"breadcrumb breadcrumb_final"}
+                                        aria-current="page"
                                     >{breadcrumb.name.clone()}</span>
                                 }
                             }).collect::<Vec<_>>(), &html!{{"»"}})}
@@ -478,7 +481,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                                 }
                             }
                             <form id="search_form" action="/search/" method="get">
-                                <input id="search_query" type="search" name="query" minlength={1}/>
+                                <input id="search_query" type="search" name="query" minlength={1} aria-label="Search query"/>
                                 <button id="search_button" type="submit">{"Search"}</button>
                             </form>
                         </nav>

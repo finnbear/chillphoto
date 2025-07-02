@@ -17,6 +17,7 @@ use crate::output::DynLazy;
 
 pub fn serve(
     start: Instant,
+    background: bool,
     output: &HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
 ) {
     let background_threads = &AtomicUsize::new(0);
@@ -30,16 +31,21 @@ pub fn serve(
         .max(1);
     std::thread::scope(|scope| {
         // Background initialization.
-        let cpus = (available_parallelism / 2).min(4);
-        for thread in 0..cpus {
+        let background_tasks = if background {
+            (available_parallelism / 2).min(4)
+        } else {
+            0
+        };
+        for thread in 0..background_tasks {
             let _guard = Guard::new(background_threads);
             scope.spawn(move || {
                 let _guard = _guard;
-                while let Some((_, (i, _))) = {
+                while let Some((_name, (i, _))) = {
                     let next = work.lock().unwrap().next();
                     next
                 } {
                     LazyLock::force(i);
+                    //println!("[background] {_name}");
                     while http_threads.load(Ordering::SeqCst) > thread {
                         std::thread::sleep(Duration::from_millis(1000));
                     }

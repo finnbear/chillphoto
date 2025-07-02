@@ -84,7 +84,14 @@ enum Command {
         limit: usize,
     },
     /// Serve gallery preview.
-    Serve,
+    Serve {
+        /// In between HTTP requests, build a cache of image
+        /// assets in the background. This is RAM-prohibitive
+        /// for large galleries but can reduce latency when
+        /// browsing small galleries.
+        #[arg(long)]
+        background: bool,
+    },
     /// Build static gallery website.
     Build,
     /// Clear the output directory.
@@ -475,8 +482,8 @@ fn main() {
         start.elapsed().as_secs_f32(),
     );
 
-    if matches!(args.command, Command::Serve) {
-        serve(start, &output);
+    if let Command::Serve { background } = &args.command {
+        serve(start, *background, &output);
     } else {
         let progress = ProgressBar::new(output.len() as u64)
             .with_message("Saving website...")
