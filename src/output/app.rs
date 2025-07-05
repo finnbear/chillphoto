@@ -61,6 +61,10 @@ pub fn app(props: AppProps<'_>) -> Html {
             color: var(--colored-text-light-background);
         }
 
+        p a, span a, footer a, li a:not(.sidebar_panel_list_link), details a {
+            text-decoration: underline;
+        }
+
         #page {
             background-color: white;
             max-width: 60rem;
@@ -196,7 +200,7 @@ pub fn app(props: AppProps<'_>) -> Html {
 
         .sidebar_panel_list_item { 
             list-style: none;
-            margin-top: 0.2rem;
+            margin-top: 0.25rem;
             font-size: 0.9rem;
         }
 
@@ -206,6 +210,10 @@ pub fn app(props: AppProps<'_>) -> Html {
 
         details.sidebar_details_panel_text > summary {
             margin-left: .2rem;
+        }
+
+        details > summary {
+            cursor: pointer;
         }
   
         .sidebar_panel_list_item::before { 
