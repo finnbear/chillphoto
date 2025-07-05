@@ -349,7 +349,17 @@ impl Gallery {
                                 gallery: self,
                                 title: page.name.clone().into(),
                                 description: page.config.description.clone().map(|s| s.into()),
-                                head: Default::default(),
+                                head: html!{
+                                    <style>
+                                        {Html::from_html_unchecked(
+                                            r#"
+                                            #page_main_body {
+                                                user-select: text;
+                                            }
+                                            "#.into()
+                                        )}
+                                    </style>
+                                },
                                 body: rich_text_html(&page.text),
                                 sidebar: Html::default(),
                                 pages: page_items.clone(),

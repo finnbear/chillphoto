@@ -52,6 +52,10 @@ pub fn app(props: AppProps<'_>) -> Html {
             font-family: Times, "Times New Roman", Georgia, serif;
         }
 
+        img, summary {
+            user-select: none;
+        }
+
         a {
             text-decoration: none;
             color: var(--colored-text-light-background);

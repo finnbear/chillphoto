@@ -88,7 +88,8 @@ enum Command {
         /// In between HTTP requests, build a cache of image
         /// assets in the background. This is RAM-prohibitive
         /// for large galleries but can reduce latency when
-        /// browsing small galleries.
+        /// browsing small galleries. A better alternative is
+        /// using a web browser that supports Speculation Rules.
         #[arg(long)]
         background: bool,
     },
