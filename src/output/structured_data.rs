@@ -244,6 +244,7 @@ pub struct BreadcrumbListElement {
 
 #[derive(Serialize)]
 pub struct SearchActionStructuredData {
+    #[serde(rename = "@type")]
     pub _type: &'static str,
     pub target: String,
     pub query: &'static str,
@@ -261,5 +262,6 @@ pub struct WebSiteStructuredData {
     pub description: Option<String>,
     #[serde(rename = "copyrightHolder", skip_serializing_if = "Option::is_none")]
     pub copyright_holder: Option<PersonStructuredData>,
+    #[serde(rename = "potentialAction")]
     pub potential_action: Option<SearchActionStructuredData>,
 }
