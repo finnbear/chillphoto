@@ -1,5 +1,5 @@
 use image::RgbImage;
-use std::sync::OnceLock;
+use std::{path::PathBuf, sync::OnceLock};
 
 mod category;
 mod category_path;
@@ -31,6 +31,8 @@ pub struct Gallery {
     pub head_html: Option<String>,
     pub home_text: Option<RichText>,
     pub static_files: Vec<StaticFile>,
+    /// Path to top level of gallery source files in file system.
+    pub root: PathBuf,
 }
 
 impl Gallery {

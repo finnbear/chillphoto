@@ -14,12 +14,11 @@ use output::serve;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{ErrorKind, Write};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
-use toml_edit::DocumentMut;
 use util::remove_dir_contents;
 use wax::Glob;
 
@@ -167,6 +166,7 @@ fn main() {
             head_html: None,
             home_text: None,
             static_files: Vec::new(),
+            root,
         },
         item_configs: HashMap::new(),
     });
@@ -429,31 +429,11 @@ fn main() {
         });
 
         let each = |(path, photo): (CategoryPath, &Photo)| {
-            let mut config_path = root.clone();
-            for path in path.iter_paths().skip(1) {
-                config_path.push(&gallery.category(&path).unwrap().name);
-            }
-            config_path.push(format!("{}.toml", photo.name));
-
-            let mut file = fs::OpenOptions::new()
-                .read(true)
-                .create(true)
-                .write(true)
-                .open(&config_path)
-                .unwrap();
-            file.seek(std::io::SeekFrom::Start(0)).unwrap();
-            let mut existing = String::new();
-            file.read_to_string(&mut existing).unwrap();
-            let mut doc = existing.parse::<DocumentMut>().unwrap();
-
-            if *image_ai {
-                init_image_ai(&gallery, &path, photo, &mut doc);
-            }
-
-            file.seek(SeekFrom::Start(0)).unwrap();
-            file.set_len(0).unwrap();
-            file.write_all(doc.to_string().as_bytes()).unwrap();
-            file.sync_data().unwrap();
+            PhotoConfig::edit(&gallery, &path, photo, |doc| {
+                if *image_ai {
+                    init_image_ai(&gallery, &path, photo, doc);
+                }
+            });
         };
         if gallery.config.image_ai_api_key.is_some() {
             jobs.into_par_iter().for_each(each);

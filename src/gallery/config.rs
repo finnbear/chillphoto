@@ -1,7 +1,16 @@
-use crate::{gallery::CategoryPath, output::OutputFormat, util::add_trailing_slash_if_nonempty};
+use crate::{
+    gallery::{CategoryPath, Gallery, Photo},
+    output::OutputFormat,
+    util::add_trailing_slash_if_nonempty,
+};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{
+    fs,
+    io::{Read, Seek, SeekFrom, Write},
+    path::Path,
+};
+use toml_edit::DocumentMut;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GalleryConfig {
@@ -283,6 +292,39 @@ fn default_thumbnail_crop_center() -> Point2 {
 impl Default for PhotoConfig {
     fn default() -> Self {
         toml::from_str("").unwrap()
+    }
+}
+
+impl PhotoConfig {
+    pub fn edit(
+        gallery: &Gallery,
+        path: &CategoryPath,
+        photo: &Photo,
+        mut edit: impl FnMut(&mut DocumentMut),
+    ) {
+        let mut config_path = gallery.root.clone();
+        for path in path.iter_paths().skip(1) {
+            config_path.push(&gallery.category(&path).unwrap().name);
+        }
+        config_path.push(format!("{}.toml", photo.name));
+
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .create(true)
+            .write(true)
+            .open(&config_path)
+            .unwrap();
+        file.seek(std::io::SeekFrom::Start(0)).unwrap();
+        let mut existing = String::new();
+        file.read_to_string(&mut existing).unwrap();
+        let mut doc = existing.parse::<DocumentMut>().unwrap();
+
+        edit(&mut doc);
+
+        file.seek(SeekFrom::Start(0)).unwrap();
+        file.set_len(0).unwrap();
+        file.write_all(doc.to_string().as_bytes()).unwrap();
+        file.sync_data().unwrap();
     }
 }
 
