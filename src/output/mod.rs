@@ -22,6 +22,7 @@ use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{html, Html};
 
 mod app;
+mod build;
 mod format;
 mod pwa;
 mod rich_text;
@@ -30,6 +31,7 @@ mod serve;
 mod structured_data;
 
 pub use app::*;
+pub use build::*;
 pub use format::*;
 pub use pwa::*;
 pub use rich_text::*;
