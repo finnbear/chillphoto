@@ -40,6 +40,8 @@ pub fn render_api(gallery: &Gallery) -> Vec<u8> {
         });
     });
 
+    photos.sort_by_key(|p| p.photo_path.clone());
+
     let json = serde_json::to_string(&Api {
         title: gallery.config.title.clone(),
         description: gallery.config.description.clone(),

@@ -7,7 +7,7 @@ pub struct RichText {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum RichTextFormat {
     PlainText,
     Markdown,
