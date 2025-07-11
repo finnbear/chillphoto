@@ -88,7 +88,10 @@ struct ApiPhoto {
     photo_path: String,
     preview_path: String,
     thumbnail_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     license_url: Option<String>,
 }
