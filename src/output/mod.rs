@@ -21,6 +21,7 @@ use std::{
 use xmp_toolkit::{xmp_ns, OpenFileOptions, XmpMeta, XmpValue};
 use yew::{html, Html};
 
+mod api;
 mod app;
 mod build;
 mod format;
@@ -30,6 +31,7 @@ mod search;
 mod serve;
 mod structured_data;
 
+pub use api::*;
 pub use app::*;
 pub use build::*;
 pub use format::*;
@@ -439,6 +441,12 @@ impl Gallery {
                 None,
             );
         }
+        ret_insert(
+            &mut ret,
+            self.config.api_json::<false>(),
+            LazyLock::new(Box::new(move || render_api(self))),
+            None,
+        );
 
         for chunk in paginate(&self.children, self.config.items_per_page) {
             let page_items = page_items.clone();

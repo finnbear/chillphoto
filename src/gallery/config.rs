@@ -219,6 +219,13 @@ impl GalleryConfig {
         )
     }
 
+    pub fn api_json<const PUBLIC: bool>(&self) -> String {
+        format!(
+            "{}.json",
+            self.variation::<PUBLIC>(&CategoryPath::ROOT, "api", "")
+        )
+    }
+
     pub fn page_html<const PUBLIC: bool>(&self, category: &CategoryPath, name: &str) -> String {
         let base = format!("{}/", self.variation::<PUBLIC>(category, name, ""));
         if PUBLIC {

@@ -1,8 +1,7 @@
+use crate::gallery::{Gallery, Item};
 use chrono::Datelike;
 use serde::Serialize;
 use yew::{html, Html};
-
-use crate::gallery::{Gallery, Item};
 
 pub fn render_search(gallery: &Gallery) -> Html {
     let mut items = Vec::<SearchItem>::new();
