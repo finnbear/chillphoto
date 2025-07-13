@@ -114,7 +114,7 @@ pub fn serve(
                     }
                     if path.ends_with(".svg") {
                         // Help Chrome
-                        builder = builder.header("Content-Type", "image/svg+xml\r\n");
+                        builder = builder.header("Content-Type", "image/svg+xml");
                     }
                     builder.body((&***file).to_vec()).unwrap()
                 } else {
@@ -152,19 +152,6 @@ impl<'a> Drop for Guard<'a> {
 
 fn read_request(stream: &mut TcpStream, buf: &mut Vec<u8>) -> io::Result<http::Request<Vec<u8>>> {
     loop {
-        let mut tmp = [0u8; 1024];
-        match stream.read(&mut tmp)? {
-            0 => {
-                return Err(io::Error::new(
-                    ErrorKind::UnexpectedEof,
-                    "read 0 bytes from remote",
-                ))
-            }
-            n => {
-                buf.extend_from_slice(&tmp[0..n]);
-            }
-        };
-
         let mut headers = [httparse::EMPTY_HEADER; 128];
         let mut parse_req = httparse::Request::new(&mut headers);
         let res = parse_req.parse(&buf).unwrap();
@@ -224,6 +211,19 @@ fn read_request(stream: &mut TcpStream, buf: &mut Vec<u8>) -> io::Result<http::R
             let request = builder.body(body).unwrap();
 
             break Ok(request);
+        }
+
+        let mut tmp = [0u8; 1024];
+        match stream.read(&mut tmp)? {
+            0 => {
+                return Err(io::Error::new(
+                    ErrorKind::UnexpectedEof,
+                    "read 0 bytes from remote",
+                ))
+            }
+            n => {
+                buf.extend_from_slice(&tmp[0..n]);
+            }
         }
     }
 }
