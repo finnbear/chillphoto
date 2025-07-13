@@ -78,49 +78,58 @@ pub fn serve(
             } else {
                 continue;
             };
-            scope.spawn(move || loop {
-                let mut buf = Vec::new();
 
+            let mut buf = Vec::new();
+
+            scope.spawn(move || loop {
                 let request = if let Ok(request) = read_request(&mut stream, &mut buf) {
                     request
                 } else {
                     return;
                 };
 
-                let mut path = request.uri().path().to_owned();
-                if path.ends_with('/') {
-                    path.push_str("index.html")
-                }
-                if let Some(query) = request.uri().query() {
-                    if query.contains("page=") {
-                        use std::fmt::Write;
-                        write!(path, "?{query}").unwrap();
+                let response = if request.method() == Method::GET {
+                    let mut path = request.uri().path().to_owned();
+                    if path.ends_with('/') {
+                        path.push_str("index.html")
                     }
-                }
-
-                let response = if let Some((file, hasher)) = output.get(&path) {
-                    while http_threads.load(Ordering::SeqCst) >= available_parallelism {
-                        std::thread::sleep(Duration::from_secs(50));
+                    if let Some(query) = request.uri().query() {
+                        if query.contains("page=") {
+                            use std::fmt::Write;
+                            write!(path, "?{query}").unwrap();
+                        }
                     }
 
-                    let _guard = Guard::new(http_threads);
+                    if let Some((file, hasher)) = output.get(&path) {
+                        while http_threads.load(Ordering::SeqCst) >= available_parallelism {
+                            std::thread::sleep(Duration::from_secs(50));
+                        }
 
-                    let mut builder = http::Response::builder()
-                        .version(request.version())
-                        .status(200);
+                        let _guard = Guard::new(http_threads);
 
-                    if let Some(hasher) = hasher {
-                        builder = builder.header("Etag", (&***hasher).to_owned());
+                        let mut builder = http::Response::builder()
+                            .version(request.version())
+                            .status(http::StatusCode::OK);
+
+                        if let Some(hasher) = hasher {
+                            builder = builder.header("Etag", (&***hasher).to_owned());
+                        }
+                        if path.ends_with(".svg") {
+                            // Help Chrome
+                            builder = builder.header("Content-Type", "image/svg+xml");
+                        }
+                        builder.body((&***file).to_vec()).unwrap()
+                    } else {
+                        http::Response::builder()
+                            .version(request.version())
+                            .status(http::StatusCode::NOT_FOUND)
+                            .body(b"not found".to_vec())
+                            .unwrap()
                     }
-                    if path.ends_with(".svg") {
-                        // Help Chrome
-                        builder = builder.header("Content-Type", "image/svg+xml");
-                    }
-                    builder.body((&***file).to_vec()).unwrap()
                 } else {
                     http::Response::builder()
                         .version(request.version())
-                        .status(404)
+                        .status(http::StatusCode::METHOD_NOT_ALLOWED)
                         .body(b"not found".to_vec())
                         .unwrap()
                 };
