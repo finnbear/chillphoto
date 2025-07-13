@@ -1,4 +1,4 @@
-use http::{Method, Uri, Version};
+use http::{HeaderValue, Method, Uri, Version};
 use httparse::Status;
 use std::io::{self, ErrorKind};
 use std::net::TcpStream;
@@ -112,6 +112,10 @@ pub fn serve(
                     if let Some(hasher) = hasher {
                         builder = builder.header("Etag", (&***hasher).to_owned());
                     }
+                    if path.ends_with(".svg") {
+                        // Help Chrome
+                        builder = builder.header("Content-Type", "image/svg+xml\r\n");
+                    }
                     builder.body((&***file).to_vec()).unwrap()
                 } else {
                     http::Response::builder()
@@ -123,7 +127,7 @@ pub fn serve(
 
                 println!("[{}] {}", response.status(), request.uri());
 
-                if write_response(&mut stream, &path, response).is_err() {
+                if write_response(&mut stream, response).is_err() {
                     return;
                 }
             });
@@ -224,11 +228,7 @@ fn read_request(stream: &mut TcpStream, buf: &mut Vec<u8>) -> io::Result<http::R
     }
 }
 
-fn write_response(
-    stream: &mut TcpStream,
-    path: &str,
-    response: http::Response<Vec<u8>>,
-) -> io::Result<()> {
+fn write_response(stream: &mut TcpStream, mut response: http::Response<Vec<u8>>) -> io::Result<()> {
     let mut header = format!(
         "{:?} {} {}\r\n",
         response.version(),
@@ -236,20 +236,20 @@ fn write_response(
         response.status().canonical_reason().unwrap()
     );
 
+    let content_length = response.body().len();
+    response.headers_mut().insert(
+        "Content-Length",
+        HeaderValue::from_str(&content_length.to_string()).unwrap(),
+    );
+
     for (name, value) in response.headers() {
-        header.push_str(&format!("{}: {}\r\n", name, value.to_str().unwrap_or("")));
+        use std::fmt::Write;
+        write!(header, "{}: {}\r\n", name, value.to_str().unwrap_or("")).unwrap();
     }
 
-    let body: &[u8] = response.body().as_ref();
-    let content_length = body.len();
-    header.push_str(&format!("Content-Length: {}\r\n", content_length));
-    if path.ends_with(".svg") {
-        // Help Chrome
-        header.push_str("Content-Type: image/svg+xml\r\n");
-    }
     header.push_str("\r\n");
     stream.write_all(header.as_bytes())?;
-    stream.write_all(body)?;
+    stream.write_all(&response.body())?;
     stream.flush()?;
     Ok(())
 }
