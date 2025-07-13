@@ -1,5 +1,7 @@
 use http::{Method, Uri, Version};
 use httparse::Status;
+use std::io::{self, ErrorKind};
+use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Instant;
 use std::{
@@ -77,51 +79,10 @@ pub fn serve(
                 continue;
             };
             scope.spawn(move || {
-                let mut buf = Vec::new();
-
-                let (request, _body) = loop {
-                    let mut tmp = [0u8; 1024];
-                    match stream.read(&mut tmp) {
-                        Ok(0) => return,
-                        Ok(n) => {
-                            buf.extend_from_slice(&tmp[0..n]);
-                        }
-                        Err(_) => {
-                            return;
-                        }
-                    };
-
-                    let mut headers = [httparse::EMPTY_HEADER; 128];
-                    let mut parse_req = httparse::Request::new(&mut headers);
-                    let res = parse_req.parse(&buf).unwrap();
-                    if let Status::Complete(body) = res {
-                        let method = if let Some(method) =
-                            parse_req.method.and_then(|m| Method::from_str(m).ok())
-                        {
-                            method
-                        } else {
-                            return;
-                        };
-                        let uri =
-                            if let Some(uri) = parse_req.path.and_then(|p| Uri::from_str(p).ok()) {
-                                uri
-                            } else {
-                                return;
-                            };
-                        let mut builder = http::Request::builder().method(method).uri(uri).version(
-                            if parse_req.version == Some(1) {
-                                Version::HTTP_11
-                            } else {
-                                Version::HTTP_10
-                            },
-                        );
-                        for header in parse_req.headers {
-                            builder = builder.header(header.name, header.value);
-                        }
-                        let request = builder.body(Vec::<u8>::new()).unwrap();
-
-                        break (request, body);
-                    }
+                let request = if let Ok(request) = read_request(&mut stream) {
+                    request
+                } else {
+                    return;
                 };
 
                 let mut path = request.uri().path().to_owned();
@@ -207,5 +168,85 @@ impl<'a> Guard<'a> {
 impl<'a> Drop for Guard<'a> {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+pub fn read_request(stream: &mut TcpStream) -> io::Result<http::Request<Vec<u8>>> {
+    let mut buf = Vec::new();
+
+    loop {
+        let mut tmp = [0u8; 1024];
+        match stream.read(&mut tmp)? {
+            0 => {
+                return Err(io::Error::new(
+                    ErrorKind::UnexpectedEof,
+                    "read 0 bytes from remote",
+                ))
+            }
+            n => {
+                buf.extend_from_slice(&tmp[0..n]);
+            }
+        };
+
+        let mut headers = [httparse::EMPTY_HEADER; 128];
+        let mut parse_req = httparse::Request::new(&mut headers);
+        let res = parse_req.parse(&buf).unwrap();
+        if let Status::Complete(body) = res {
+            let method =
+                if let Some(method) = parse_req.method.and_then(|m| Method::from_str(m).ok()) {
+                    method
+                } else {
+                    return Err(io::Error::new(ErrorKind::InvalidData, "invalid method"));
+                };
+            let uri = if let Some(uri) = parse_req.path.and_then(|p| Uri::from_str(p).ok()) {
+                uri
+            } else {
+                return Err(io::Error::new(ErrorKind::InvalidData, "invalid URI"));
+            };
+            let mut builder = http::Request::builder().method(method).uri(uri).version(
+                if parse_req.version == Some(1) {
+                    Version::HTTP_11
+                } else {
+                    Version::HTTP_10
+                },
+            );
+            for header in parse_req.headers {
+                builder = builder.header(header.name, header.value);
+            }
+            let content_length =
+                if let Some(n) = builder.headers_ref().and_then(|h| h.get("content-length")) {
+                    if let Some(n) = n.to_str().ok().and_then(|n| n.parse::<usize>().ok()) {
+                        n
+                    } else {
+                        return Err(io::Error::new(
+                            ErrorKind::InvalidData,
+                            "invalid content-length",
+                        ));
+                    }
+                } else {
+                    0
+                };
+
+            if content_length > 1024 * 1024 {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    "excessive content-length",
+                ));
+            }
+
+            // Consume the request.
+            buf.splice(0..body, std::iter::empty());
+
+            // Allocate for reading body.
+            //
+            // TODO: this prevents re-using the connection
+            buf.resize(content_length, 0);
+
+            stream.read_exact(&mut buf)?;
+
+            let request = builder.body(buf).unwrap();
+
+            break Ok(request);
+        }
     }
 }
