@@ -78,8 +78,10 @@ pub fn serve(
             } else {
                 continue;
             };
-            scope.spawn(move || {
-                let request = if let Ok(request) = read_request(&mut stream) {
+            scope.spawn(move || loop {
+                let mut buf = Vec::new();
+
+                let request = if let Ok(request) = read_request(&mut stream, &mut buf) {
                     request
                 } else {
                     return;
@@ -121,36 +123,9 @@ pub fn serve(
 
                 println!("[{}] {}", response.status(), request.uri());
 
-                let status_line = format!(
-                    "{:?} {} {}\r\n",
-                    response.version(),
-                    response.status().as_u16(),
-                    response.status().canonical_reason().unwrap()
-                );
-
-                let mut headers = String::new();
-                for (name, value) in response.headers() {
-                    headers.push_str(&format!("{}: {}\r\n", name, value.to_str().unwrap_or("")));
-                }
-
-                let body: &[u8] = response.body().as_ref();
-                let content_length = body.len();
-                headers.push_str(&format!("Content-Length: {}\r\n", content_length));
-                if path.ends_with(".svg") {
-                    // Help Chrome
-                    headers.push_str("Content-Type: image/svg+xml\r\n");
-                }
-                headers.push_str("\r\n");
-                if stream.write_all(status_line.as_bytes()).is_err() {
+                if write_response(&mut stream, &path, response).is_err() {
                     return;
                 }
-                if stream.write_all(headers.as_bytes()).is_err() {
-                    return;
-                }
-                if stream.write_all(body).is_err() {
-                    return;
-                }
-                let _ = stream.flush();
             });
         }
     });
@@ -171,9 +146,7 @@ impl<'a> Drop for Guard<'a> {
     }
 }
 
-pub fn read_request(stream: &mut TcpStream) -> io::Result<http::Request<Vec<u8>>> {
-    let mut buf = Vec::new();
-
+fn read_request(stream: &mut TcpStream, buf: &mut Vec<u8>) -> io::Result<http::Request<Vec<u8>>> {
     loop {
         let mut tmp = [0u8; 1024];
         match stream.read(&mut tmp)? {
@@ -238,15 +211,45 @@ pub fn read_request(stream: &mut TcpStream) -> io::Result<http::Request<Vec<u8>>
             buf.splice(0..body, std::iter::empty());
 
             // Allocate for reading body.
-            //
-            // TODO: this prevents re-using the connection
-            buf.resize(content_length, 0);
+            buf.resize(buf.len().max(content_length), 0);
 
-            stream.read_exact(&mut buf)?;
+            stream.read_exact(&mut buf[0..content_length])?;
 
-            let request = builder.body(buf).unwrap();
+            let new_buf = buf.split_off(content_length);
+            let body = std::mem::replace(buf, new_buf);
+            let request = builder.body(body).unwrap();
 
             break Ok(request);
         }
     }
+}
+
+fn write_response(
+    stream: &mut TcpStream,
+    path: &str,
+    response: http::Response<Vec<u8>>,
+) -> io::Result<()> {
+    let mut header = format!(
+        "{:?} {} {}\r\n",
+        response.version(),
+        response.status().as_u16(),
+        response.status().canonical_reason().unwrap()
+    );
+
+    for (name, value) in response.headers() {
+        header.push_str(&format!("{}: {}\r\n", name, value.to_str().unwrap_or("")));
+    }
+
+    let body: &[u8] = response.body().as_ref();
+    let content_length = body.len();
+    header.push_str(&format!("Content-Length: {}\r\n", content_length));
+    if path.ends_with(".svg") {
+        // Help Chrome
+        header.push_str("Content-Type: image/svg+xml\r\n");
+    }
+    header.push_str("\r\n");
+    stream.write_all(header.as_bytes())?;
+    stream.write_all(body)?;
+    stream.flush()?;
+    Ok(())
 }
