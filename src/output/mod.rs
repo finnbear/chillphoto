@@ -185,7 +185,21 @@ impl Gallery {
                                 gallery: self,
                                 title: format!("{} | {group}", photo.output_name()).into(),
                                 description: photo.config.description.clone().map(|s| s.into()),
-                                head: photo_structured_data,
+                                head: html!{<>
+                                    {photo_structured_data}
+                                    if self.editable {
+                                        <script>
+                                            {Html::from_html_unchecked(format!(
+                                                r#"
+                                                    const INPUT_PATH = "{}";
+                                                    {}
+                                                "#,
+                                                path.push(photo.slug()),
+                                                include_str!("edit.js")
+                                            ).into())}
+                                        </script>
+                                    }
+                                </>},
                                 body: html! {<>
                                     <a
                                         class="preview_container"
@@ -201,6 +215,9 @@ impl Gallery {
                                     </a>
                                     if let Some(text) = &photo.text {
                                         {rich_text_html(text)}
+                                    }
+                                    if self.editable {
+                                        <button id="edit_caption">{"Edit Caption"}</button>
                                     }
                                     /*
                                     {Html::from_html_unchecked(r#"
@@ -273,6 +290,9 @@ impl Gallery {
                                                 <summary>{"Description"}</summary>
                                                 {description.clone()}
                                             </details>
+                                        }
+                                        if self.editable {
+                                            <button id="edit_config">{"Edit Config"}</button>
                                         }
                                     </div>
                                 },

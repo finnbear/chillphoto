@@ -1,5 +1,6 @@
 use http::{HeaderValue, Method, Uri, Version};
 use httparse::Status;
+use serde::Deserialize;
 use std::io::{self, ErrorKind};
 use std::net::TcpStream;
 use std::str::FromStr;
@@ -15,11 +16,13 @@ use std::{
     time::Duration,
 };
 
+use crate::gallery::{CategoryPath, Gallery, PhotoConfig, RichTextFormat};
 use crate::output::DynLazy;
 
 pub fn serve(
     start: Instant,
     background: bool,
+    gallery: &Gallery,
     output: &HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
 ) {
     let background_threads = &AtomicUsize::new(0);
@@ -112,7 +115,7 @@ pub fn serve(
                             .status(http::StatusCode::OK);
 
                         if let Some(hasher) = hasher {
-                            builder = builder.header("Etag", (&***hasher).to_owned());
+                            builder = builder.header("Etag", format!("\"{}\"", (&***hasher)));
                         }
                         if path.ends_with(".svg") {
                             // Help Chrome
@@ -126,11 +129,77 @@ pub fn serve(
                             .body(b"not found".to_vec())
                             .unwrap()
                     }
+                } else if request.method() == Method::PUT && request.uri().path() == "/" {
+                    use std::process::Command;
+
+                    #[derive(Deserialize)]
+                    enum Put {
+                        EditConfig {
+                            path: CategoryPath,
+                        },
+                        EditCaption {
+                            path: CategoryPath,
+                            format: Option<RichTextFormat>,
+                        },
+                    }
+
+                    match serde_json::from_slice::<Put>(request.body()) {
+                        Err(e) => http::Response::builder()
+                            .version(request.version())
+                            .status(http::StatusCode::BAD_REQUEST)
+                            .body(e.to_string().into_bytes())
+                            .unwrap(),
+                        Ok(Put::EditConfig { path }) => {
+                            if let Some(path) = PhotoConfig::path(gallery, &path) {
+                                Command::new(gallery.config.text_editor.as_ref().unwrap())
+                                    .arg(path)
+                                    .spawn()
+                                    .unwrap();
+
+                                http::Response::builder()
+                                    .version(request.version())
+                                    .status(http::StatusCode::OK)
+                                    .body(b"ok".to_vec())
+                                    .unwrap()
+                            } else {
+                                http::Response::builder()
+                                    .version(request.version())
+                                    .status(http::StatusCode::NOT_FOUND)
+                                    .body(b"not found".to_vec())
+                                    .unwrap()
+                            }
+                        }
+                        Ok(Put::EditCaption { path, format }) => {
+                            let photo = gallery.photo(&path).unwrap();
+                            // Don't allow format changes.
+                            let format = photo
+                                .text
+                                .as_ref()
+                                .map(|t| t.format)
+                                .or(format)
+                                .unwrap_or_default();
+                            let mut page_path = gallery.root.clone();
+                            for path in path.pop().unwrap().iter_paths().skip(1) {
+                                page_path.push(&gallery.category(&path).unwrap().name);
+                            }
+                            page_path.push(format!("{}.{}", photo.name, format.extension()));
+                            Command::new(gallery.config.text_editor.as_ref().unwrap())
+                                .arg(page_path)
+                                .spawn()
+                                .unwrap();
+
+                            http::Response::builder()
+                                .version(request.version())
+                                .status(http::StatusCode::OK)
+                                .body(b"ok".to_vec())
+                                .unwrap()
+                        }
+                    }
                 } else {
                     http::Response::builder()
                         .version(request.version())
                         .status(http::StatusCode::METHOD_NOT_ALLOWED)
-                        .body(b"not found".to_vec())
+                        .body(b"method not allowed".to_vec())
                         .unwrap()
                 };
 
@@ -210,10 +279,15 @@ fn read_request(stream: &mut TcpStream, buf: &mut Vec<u8>) -> io::Result<http::R
             // Consume the request.
             buf.splice(0..body, std::iter::empty());
 
-            // Allocate for reading body.
-            buf.resize(buf.len().max(content_length), 0);
+            let already_read = buf.len().min(content_length);
 
-            stream.read_exact(&mut buf[0..content_length])?;
+            if content_length > already_read {
+                // Allocate for reading rest of body.
+                buf.resize(content_length, 0);
+
+                // Read rest of body.
+                stream.read_exact(&mut buf[already_read..content_length])?;
+            }
 
             let new_buf = buf.split_off(content_length);
             let body = std::mem::replace(buf, new_buf);

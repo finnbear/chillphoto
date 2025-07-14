@@ -1,5 +1,5 @@
 use crate::{
-    gallery::{CategoryPath, Gallery, Photo},
+    gallery::{CategoryPath, Gallery},
     output::OutputFormat,
     util::add_trailing_slash_if_nonempty,
 };
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use toml_edit::DocumentMut;
 
@@ -58,6 +58,7 @@ pub struct GalleryConfig {
     /// Format specification: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
     #[serde(default = "default_date_format")]
     pub date_format: String,
+    pub text_editor: Option<String>,
 }
 
 fn default_date_format() -> String {
@@ -303,18 +304,18 @@ impl Default for PhotoConfig {
 }
 
 impl PhotoConfig {
-    pub fn edit(
-        gallery: &Gallery,
-        path: &CategoryPath,
-        photo: &Photo,
-        mut edit: impl FnMut(&mut DocumentMut),
-    ) {
+    pub fn path(gallery: &Gallery, path: &CategoryPath) -> Option<PathBuf> {
+        let photo = gallery.photo(path)?;
         let mut config_path = gallery.root.clone();
-        for path in path.iter_paths().skip(1) {
+        for path in path.pop().unwrap().iter_paths().skip(1) {
             config_path.push(&gallery.category(&path).unwrap().name);
         }
         config_path.push(format!("{}.toml", photo.name));
+        Some(config_path)
+    }
 
+    pub fn edit(gallery: &Gallery, path: &CategoryPath, mut edit: impl FnMut(&mut DocumentMut)) {
+        let config_path = Self::path(gallery, path).unwrap();
         let mut file = fs::OpenOptions::new()
             .read(true)
             .create(true)

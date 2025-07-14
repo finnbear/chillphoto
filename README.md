@@ -67,6 +67,7 @@ image_ai_model = "gemma3"
 ai_description_hint = "do not mention text in photos"
 items_per_page = 30
 date_format = "..." # see https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+text_editor = "code" # for opening config files in serve mode
 ```
 
 ### Category config

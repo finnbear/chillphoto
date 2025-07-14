@@ -33,6 +33,7 @@ pub struct Gallery {
     pub static_files: Vec<StaticFile>,
     /// Path to top level of gallery source files in file system.
     pub root: PathBuf,
+    pub editable: bool,
 }
 
 impl Gallery {
@@ -115,6 +116,20 @@ impl Gallery {
         }
 
         Some(current)
+    }
+
+    pub fn photo(&self, path: &CategoryPath) -> Option<&Photo> {
+        let name = if let Some(name) = path.last_segment() {
+            name
+        } else {
+            return None;
+        };
+        let parent = self.category(&path.pop().unwrap())?;
+        parent
+            .children
+            .iter()
+            .filter_map(|c| c.photo())
+            .find(|p| p.slug() == name)
     }
 
     pub fn visit_items<'a>(&'a self, mut visitor: impl FnMut(&CategoryPath, &'a Item)) {

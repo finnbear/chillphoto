@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RichText {
@@ -6,10 +6,21 @@ pub struct RichText {
     pub format: RichTextFormat,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RichTextFormat {
-    PlainText,
+    #[default]
     Markdown,
+    PlainText,
     Html,
+}
+
+impl RichTextFormat {
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Markdown => "md",
+            Self::PlainText => "txt",
+            Self::Html => "html",
+        }
+    }
 }

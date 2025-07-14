@@ -158,6 +158,7 @@ fn main() {
         gallery: Gallery {
             children: Vec::new(),
             favicon: None,
+            editable: matches!(args.command, Command::Serve { .. }) && config.text_editor.is_some(),
             config,
             head_html: None,
             home_text: None,
@@ -425,7 +426,7 @@ fn main() {
         });
 
         let each = |(path, photo): (CategoryPath, &Photo)| {
-            PhotoConfig::edit(&gallery, &path, photo, |doc| {
+            PhotoConfig::edit(&gallery, &path, |doc| {
                 if *image_ai {
                     init_image_ai(&gallery, &path, photo, doc);
                 }
@@ -460,7 +461,7 @@ fn main() {
     );
 
     if let Command::Serve { background } = &args.command {
-        serve(start, *background, &output);
+        serve(start, *background, &gallery, &output);
     } else {
         build(start, &gallery, &output)
     }

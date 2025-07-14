@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use serde::Deserialize;
+
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub struct CategoryPath {
     /// Each corresponds to a slug with hyphens,
@@ -81,6 +83,19 @@ impl CategoryPath {
 
     pub fn last_segment(&self) -> Option<&str> {
         self.segments.last().map(|s| s.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for CategoryPath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        if s.contains(' ') {
+            return Err(serde::de::Error::custom("Invalid char in path"));
+        }
+        Ok(Self::new(s))
     }
 }
 
