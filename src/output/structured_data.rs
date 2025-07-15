@@ -248,6 +248,8 @@ pub struct SearchActionStructuredData {
     pub _type: &'static str,
     pub target: String,
     pub query: &'static str,
+    #[serde(rename = "query-input")]
+    pub query_input: &'static str,
 }
 
 /// https://schema.org/WebSite

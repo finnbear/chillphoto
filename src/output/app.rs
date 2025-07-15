@@ -352,6 +352,7 @@ pub fn app(props: AppProps<'_>) -> Html {
                     _type: "SearchAction",
                     target: format!("{root_url}/search?&query={{query}}"),
                     query: "required",
+                    query_input: "required name=query",
                 }
             }),
         });
