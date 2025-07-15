@@ -426,7 +426,7 @@ fn main() {
         });
 
         let each = |(path, photo): (CategoryPath, &Photo)| {
-            PhotoConfig::edit(&gallery, &path, |doc| {
+            PhotoConfig::edit(&gallery, &path.push(photo.slug()), |doc| {
                 if *image_ai {
                     init_image_ai(&gallery, &path, photo, doc);
                 }
