@@ -1,6 +1,6 @@
 use crate::{gallery::Gallery, output::DynLazy, util::recursively_remove_empty_dirs_of_contents};
 use indicatif::{ProgressBar, ProgressStyle};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::HashMap,
     fs,
@@ -12,7 +12,7 @@ use wax::Glob;
 pub fn build(
     start: Instant,
     gallery: &Gallery,
-    output: &HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
+    output: HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
 ) {
     let progress = ProgressBar::new(output.len() as u64)
         .with_message("Saving website...")
@@ -42,41 +42,43 @@ pub fn build(
     }
     recursively_remove_empty_dirs_of_contents(&gallery.config.output).unwrap();
 
-    output.par_iter().for_each(|(path, (generator, hasher))| {
-        let path = gallery.config.subdirectory(path.strip_prefix('/').unwrap());
+    output
+        .into_par_iter()
+        .for_each(|(path, (generator, hasher))| {
+            let path = gallery.config.subdirectory(path.strip_prefix('/').unwrap());
 
-        let new_hash = hasher.as_ref().map(|hasher| (&**hasher).as_bytes());
+            let new_hash = hasher.as_ref().map(|hasher| (&**hasher).as_bytes());
 
-        let mut reuse = false;
-        if let Some(new_hash) = new_hash {
-            if fs::exists(&path).unwrap() {
-                if let Ok(Some(old_hash)) = fsquirrel::get(&path, "chillphotohash") {
-                    if old_hash == new_hash {
-                        reuse = true;
+            let mut reuse = false;
+            if let Some(new_hash) = new_hash {
+                if fs::exists(&path).unwrap() {
+                    if let Ok(Some(old_hash)) = fsquirrel::get(&path, "chillphotohash") {
+                        if old_hash == new_hash {
+                            reuse = true;
+                        }
                     }
+                }
+
+                total.fetch_add(1, Ordering::Relaxed);
+                if reuse {
+                    reused.fetch_add(1, Ordering::Relaxed);
                 }
             }
 
-            total.fetch_add(1, Ordering::Relaxed);
-            if reuse {
-                reused.fetch_add(1, Ordering::Relaxed);
+            if !reuse {
+                let contents = &**generator;
+                if let Some((dir, _)) = path.rsplit_once('/') {
+                    std::fs::create_dir_all(dir).unwrap();
+                }
+                let _ = fsquirrel::remove(&path, "chillphotohash");
+                std::fs::write(&path, contents).unwrap();
+                if let Some(new_hash) = new_hash {
+                    fsquirrel::set(&path, "chillphotohash", new_hash).unwrap();
+                }
             }
-        }
 
-        if !reuse {
-            let contents = &**generator;
-            if let Some((dir, _)) = path.rsplit_once('/') {
-                std::fs::create_dir_all(dir).unwrap();
-            }
-            let _ = fsquirrel::remove(&path, "chillphotohash");
-            std::fs::write(&path, contents).unwrap();
-            if let Some(new_hash) = new_hash {
-                fsquirrel::set(&path, "chillphotohash", new_hash).unwrap();
-            }
-        }
-
-        progress.inc(1);
-    });
+            progress.inc(1);
+        });
 
     progress.finish_and_clear();
 

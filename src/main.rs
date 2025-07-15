@@ -463,6 +463,6 @@ fn main() {
     if let Command::Serve { background } = &args.command {
         serve(start, *background, &gallery, &output);
     } else {
-        build(start, &gallery, &output)
+        build(start, &gallery, output)
     }
 }
