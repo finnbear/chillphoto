@@ -90,7 +90,7 @@ impl Gallery {
             manifest.drain(0..index);
         }
         if manifest.len() > limit {
-            println!("WARNING: truncated to {limit} photos");
+            println!("WARNING: truncated to {limit} photos; next is \"{}\"", manifest[limit].title);
             manifest.truncate(limit);
         }
 
