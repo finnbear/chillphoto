@@ -1,8 +1,11 @@
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::time::Instant;
 
 use base64::Engine;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
 
 // https://stackoverflow.com/a/65573340/3064544
 pub fn remove_dir_contents<P: AsRef<Path>>(path: P) -> io::Result<()> {
@@ -81,4 +84,15 @@ pub fn checksum(b: &[u8]) -> String {
 
 pub fn is_camera_file_name(name: &str) -> bool {
     name.starts_with("IMG") || name.starts_with("DSC")
+}
+
+pub fn progress_bar(name: &str, count: usize, start: Instant) -> ProgressBar {
+    ProgressBar::new(count as u64)
+        .with_message(name.to_owned())
+        .with_style(
+            ProgressStyle::default_bar()
+                .template("{msg} {wide_bar} {pos}/{len} {eta}")
+                .unwrap(),
+        )
+        .with_elapsed(start.elapsed())
 }

@@ -1,5 +1,4 @@
-use crate::{gallery::Gallery, output::DynLazy, util::recursively_remove_empty_dirs_of_contents};
-use indicatif::{ProgressBar, ProgressStyle};
+use crate::{gallery::Gallery, output::DynLazy, util::{progress_bar, recursively_remove_empty_dirs_of_contents}};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::HashMap,
@@ -14,14 +13,7 @@ pub fn build(
     gallery: &Gallery,
     output: HashMap<String, (DynLazy<'_, Vec<u8>>, Option<DynLazy<'_, String>>)>,
 ) {
-    let progress = ProgressBar::new(output.len() as u64)
-        .with_message("Saving website...")
-        .with_style(
-            ProgressStyle::default_bar()
-                .template("{msg} {wide_bar} {pos}/{len} {eta}")
-                .unwrap(),
-        )
-        .with_elapsed(start.elapsed());
+    let progress = progress_bar("Saving website...", output.len(), start);
 
     let reused = AtomicUsize::new(0);
     let total = AtomicUsize::new(0);

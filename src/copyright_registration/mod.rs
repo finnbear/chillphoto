@@ -1,13 +1,16 @@
 use crate::gallery::{Item, Photo};
 use crate::output::write_image;
+use crate::util::progress_bar;
 use crate::{gallery::Gallery, output::OutputFormat};
 use chrono::Datelike;
 use chrono::{NaiveDate, NaiveDateTime};
 use genpdfi::fonts::{FontData, FontFamily};
 use genpdfi::style::{Style, StyledString};
 use genpdfi::{elements, Margins, SimplePageDecorator};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::fs;
 use std::io::{Cursor, Write};
+use std::time::Instant;
 use zip::write::{SimpleFileOptions, ZipWriter};
 
 mod genpdfi_cell_decorator;
@@ -25,6 +28,7 @@ impl Gallery {
         start: Option<&str>,
         limit: usize,
         resolution: u32,
+        start_instant: Instant,
     ) {
         // Copyright office doesn't support WebP.
         if self.config.photo_format == OutputFormat::WebP {
@@ -36,6 +40,7 @@ impl Gallery {
             title: String,
             date_time: NaiveDateTime,
             photo: &'a Photo,
+            image_bytes: Option<Vec<u8>>,
         }
 
         let mut archive = ZipWriter::new(Cursor::new(Vec::<u8>::new()));
@@ -77,6 +82,7 @@ impl Gallery {
                 filename,
                 date_time,
                 photo,
+                image_bytes: None,
             });
         });
 
@@ -94,17 +100,26 @@ impl Gallery {
             manifest.truncate(limit);
         }
 
+        // Encode the images in parallel.
+        let progress = progress_bar("Encoding images...", manifest.len(), start_instant);
+        manifest.par_iter_mut().for_each(|submission| {
+            submission.image_bytes = Some(write_image(
+                &submission.photo.custom_preview(&self.config, resolution),
+                &submission.filename,
+                Some((&self.config, submission.photo)),
+            ));
+            progress.inc(1);
+        });
+        progress.finish_and_clear();
+
+        let progress = progress_bar("Writing archive...", manifest.len(), start_instant);
         let mut written = 0usize;
 
         for (i, submission) in manifest.iter().enumerate() {
             archive
                 .start_file(&submission.filename, zip_options)
                 .unwrap();
-            let image_bytes = write_image(
-                &submission.photo.custom_preview(&self.config, resolution),
-                &submission.filename,
-                Some((&self.config, submission.photo)),
-            );
+            let image_bytes = submission.image_bytes.as_ref().unwrap();
             archive.write_all(&image_bytes).unwrap();
             written += image_bytes.len();
             if written >= ARCHIVE_SIZE_LIMIT - 100000 {
@@ -117,7 +132,11 @@ impl Gallery {
             if latest_date.map(|d| date > d).unwrap_or(true) {
                 latest_date = Some(date);
             }
+
+            progress.inc(1);
         }
+
+        progress.finish_and_clear();
 
         let group_name = format!(
             "{} {} photos by {author} in {year}{}",

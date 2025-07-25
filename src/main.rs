@@ -441,6 +441,7 @@ fn main() {
         return;
     }
 
+    let start_instant = start;
     if let Command::Copyright {
         year,
         author,
@@ -457,6 +458,7 @@ fn main() {
             start.as_deref(),
             *limit,
             *resolution,
+            start_instant,
         );
         return;
     }
