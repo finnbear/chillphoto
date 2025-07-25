@@ -14,6 +14,8 @@ mod genpdfi_cell_decorator;
 
 pub use genpdfi_cell_decorator::*;
 
+const ARCHIVE_SIZE_LIMIT: usize = 500 * 1000 * 1000;
+
 impl Gallery {
     pub fn copyright(
         &mut self,
@@ -22,6 +24,7 @@ impl Gallery {
         case_number: &str,
         start: Option<&str>,
         limit: usize,
+        resolution: u32,
     ) {
         // Copyright office doesn't support WebP.
         if self.config.photo_format == OutputFormat::WebP {
@@ -91,16 +94,22 @@ impl Gallery {
             manifest.truncate(limit);
         }
 
-        for submission in &manifest {
+        let mut written = 0usize;
+
+        for (i, submission) in manifest.iter().enumerate() {
             archive
                 .start_file(&submission.filename, zip_options)
                 .unwrap();
             let image_bytes = write_image(
-                submission.photo.image(&self.config),
+                &submission.photo.custom_preview(&self.config, resolution),
                 &submission.filename,
                 Some((&self.config, submission.photo)),
             );
             archive.write_all(&image_bytes).unwrap();
+            written += image_bytes.len();
+            if written >= ARCHIVE_SIZE_LIMIT - 100000 {
+                panic!("exceeded archive size limit after {} photos", i + 1);
+            }
             let date = submission.date_time.date();
             if earliest_date.map(|d| date < d).unwrap_or(true) {
                 earliest_date = Some(date);
@@ -262,7 +271,7 @@ impl Gallery {
         doc.render(&mut archive).unwrap();
 
         let archive_contents = archive.finish().unwrap().into_inner();
-        assert!(archive_contents.len() <= 500 * 1000 * 1000);
+        assert!(archive_contents.len() <= ARCHIVE_SIZE_LIMIT);
         fs::write(format!("{author}-{year}.zip"), archive_contents).unwrap();
     }
 }

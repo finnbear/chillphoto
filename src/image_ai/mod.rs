@@ -111,7 +111,7 @@ pub struct ImageAiPrompt<'a> {
 
 impl<'a> ImageAiPrompt<'a> {
     pub fn checksum(&self) -> String {
-        let mut to_hash = self.photo.input_image_data.clone();
+        let mut to_hash = self.photo.input_image_data().clone();
         to_hash.extend_from_slice(self.config.image_ai_model.as_bytes());
         to_hash.extend_from_slice(self.prompt.as_bytes());
         to_hash.extend_from_slice(self.config.ai_description_system_prompt.as_bytes());

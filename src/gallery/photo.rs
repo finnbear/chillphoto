@@ -2,21 +2,27 @@ use crate::{
     gallery::{ExifData, GalleryConfig, PhotoConfig, RichText},
     util::is_camera_file_name,
 };
+use base64::Engine;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use image::{
     imageops::{self, FilterType},
+    metadata::Orientation,
     DynamicImage, ImageDecoder, ImageReader, RgbImage,
 };
-use std::{fmt::Debug, io, sync::OnceLock, time::SystemTime};
+use std::{
+    fmt::Debug,
+    fs::{File, OpenOptions},
+    io::{BufReader, Read},
+    path::PathBuf,
+    sync::OnceLock,
+    time::SystemTime,
+};
 
 pub struct Photo {
     pub name: String,
     pub text: Option<RichText>,
-    pub input_image_data: Vec<u8>,
-    pub image: OnceLock<RgbImage>,
-    pub preview: OnceLock<RgbImage>,
-    pub thumbnail: OnceLock<RgbImage>,
-    pub exif: ExifData,
+    pub path: PathBuf,
+    pub exif: OnceLock<ExifData>,
     pub file_date: Option<SystemTime>,
     pub parsed_config_date: Option<NaiveDate>,
     pub config: PhotoConfig,
@@ -25,6 +31,16 @@ pub struct Photo {
 }
 
 impl Photo {
+    pub fn exif(&self) -> &ExifData {
+        self.exif.get_or_init(|| {
+            self.image_decoder()
+                .exif_metadata()
+                .unwrap()
+                .map(|exif| ExifData::new(exif))
+                .unwrap_or_default()
+        })
+    }
+
     pub fn output_name(&self) -> &str {
         self.distinct_name
             .as_deref()
@@ -49,7 +65,7 @@ impl Photo {
     pub fn date_time(&self) -> Option<NaiveDateTime> {
         self.parsed_config_date
             .map(|d| NaiveDateTime::new(d, NaiveTime::from_hms_opt(0, 0, 0).unwrap()))
-            .or_else(|| self.exif.date_time())
+            .or_else(|| self.exif().date_time())
             .or_else(|| {
                 self.file_date.and_then(|fd| {
                     DateTime::from_timestamp_millis(
@@ -62,8 +78,37 @@ impl Photo {
             })
     }
 
+    pub fn input_image_data_file(&self) -> File {
+        OpenOptions::new().read(true).open(&self.path).unwrap()
+    }
+
+    pub fn buffered_input_image_data(&self) -> BufReader<File> {
+        BufReader::new(self.input_image_data_file())
+    }
+
+    pub fn input_image_data(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.input_image_data_file().read_to_end(&mut buf).unwrap();
+        buf
+    }
+
+    pub fn input_image_data_checksum(&self) -> String {
+        let mut ctx = md5::Context::new();
+        std::io::copy(&mut self.input_image_data_file(), &mut ctx).unwrap();
+        base64::engine::general_purpose::STANDARD_NO_PAD.encode(&ctx.compute().0)
+    }
+
+    pub fn image_decoder(&self) -> impl ImageDecoder {
+        ImageReader::new(self.buffered_input_image_data())
+            .with_guessed_format()
+            .unwrap()
+            .into_decoder()
+            .unwrap()
+    }
+
     pub fn image_dimensions(&self, config: &GalleryConfig) -> (u32, u32) {
-        if let Some((width, height)) = self.exif.dimensions().filter(|_| !self.exif.oriented()) {
+        if let Some((width, height)) = self.exif().dimensions().filter(|_| !self.exif().oriented())
+        {
             // Avoid decoding the image if we don't have to.
             resize_dimensions(
                 width,
@@ -72,40 +117,45 @@ impl Photo {
                 config.photo_resolution,
             )
         } else {
-            self.image(config).dimensions()
+            let mut decoder = self.image_decoder();
+            let mut dim = decoder.dimensions();
+            if let Ok(
+                Orientation::Rotate90
+                | Orientation::Rotate90FlipH
+                | Orientation::Rotate270
+                | Orientation::Rotate270FlipH,
+            ) = decoder.orientation()
+            {
+                std::mem::swap(&mut dim.0, &mut dim.1);
+            }
+            dim
         }
     }
 
-    pub fn image(&self, config: &GalleryConfig) -> &RgbImage {
-        self.image.get_or_init(|| {
-            let mut decoder = ImageReader::new(io::Cursor::new(&self.input_image_data))
-                .with_guessed_format()
-                .unwrap()
-                .into_decoder()
-                .unwrap();
-            let orientation = decoder.orientation();
-            let mut image = DynamicImage::from_decoder(decoder).unwrap();
+    pub fn image(&self, config: &GalleryConfig) -> RgbImage {
+        let mut decoder = self.image_decoder();
+        let orientation = decoder.orientation();
+        let mut image = DynamicImage::from_decoder(decoder).unwrap();
 
-            if let Ok(orientation) = orientation {
-                image.apply_orientation(orientation);
+        if let Ok(orientation) = orientation {
+            image.apply_orientation(orientation);
+        }
+
+        let mut rgb = image.to_rgb8();
+
+        if self.config.exposure != 0.0 {
+            for pixel in rgb.pixels_mut() {
+                const GAMMA: f32 = 2.2;
+                pixel.0 = pixel.0.map(|c| {
+                    (((c as f32 * (1.0 / u8::MAX as f32)).powf(GAMMA)
+                        * 2f32.powf(self.config.exposure as f32))
+                    .powf(1.0 / GAMMA)
+                        * u8::MAX as f32) as u8
+                });
             }
+        }
 
-            let mut rgb = image.to_rgb8();
-
-            if self.config.exposure != 0.0 {
-                for pixel in rgb.pixels_mut() {
-                    const GAMMA: f32 = 2.2;
-                    pixel.0 = pixel.0.map(|c| {
-                        (((c as f32 * (1.0 / u8::MAX as f32)).powf(GAMMA)
-                            * 2f32.powf(self.config.exposure as f32))
-                        .powf(1.0 / GAMMA)
-                            * u8::MAX as f32) as u8
-                    });
-                }
-            }
-
-            resize_image(&rgb, config.photo_resolution)
-        })
+        resize_image(&rgb, config.photo_resolution)
     }
 
     pub fn preview_dimensions(&self, config: &GalleryConfig) -> (u32, u32) {
@@ -118,19 +168,22 @@ impl Photo {
         )
     }
 
-    pub fn preview(&self, config: &GalleryConfig) -> &RgbImage {
-        self.preview
-            .get_or_init(|| resize_image(self.image(config), config.preview_resolution))
+    pub fn preview(&self, config: &GalleryConfig) -> RgbImage {
+        self.custom_preview(config, config.preview_resolution)
     }
 
-    pub fn thumbnail(&self, config: &GalleryConfig) -> &RgbImage {
-        self.thumbnail
-            .get_or_init(|| self.custom_thumbnail(config, config.thumbnail_resolution))
+    pub fn thumbnail(&self, config: &GalleryConfig) -> RgbImage {
+        self.custom_thumbnail(config, config.thumbnail_resolution)
     }
 
     /// Not cached.
     pub fn custom_thumbnail(&self, config: &GalleryConfig, resolution: u32) -> RgbImage {
-        generate_thumbnail(self.image(config), resolution, &self.config)
+        generate_thumbnail(&self.image(config), resolution, &self.config)
+    }
+
+    /// Not cached.
+    pub fn custom_preview(&self, config: &GalleryConfig, resolution: u32) -> RgbImage {
+        resize_image(&self.image(config), resolution)
     }
 }
 
@@ -138,8 +191,8 @@ impl Debug for Photo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Photo")
             .field("name", &self.name)
-            .field("exif", &self.exif)
-            .field("resolution", &self.exif.dimensions())
+            .field("exif", &self.exif())
+            .field("resolution", &self.exif().dimensions())
             .finish_non_exhaustive()
     }
 }

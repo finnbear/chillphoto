@@ -1,9 +1,8 @@
 use chrono::NaiveDateTime;
 use exif::{Exif, In, Tag};
-use std::io::Cursor;
 
 /// https://www.cipa.jp/std/documents/e/DC-008-2012_E.pdf
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 #[allow(unused)]
 pub struct ExifData {
     pub width: Option<String>,
@@ -49,9 +48,9 @@ impl ExifData {
             .is_some_and(|o| o.as_str() != "row 0 at top and column 0 at left")
     }
 
-    pub fn load(file: &[u8]) -> Self {
+    pub fn new(exif: Vec<u8>) -> Self {
         let exifreader = exif::Reader::new();
-        let meta = exifreader.read_from_container(&mut Cursor::new(file)).ok();
+        let meta = exifreader.read_raw(exif).ok();
 
         // Debug.
         // meta.as_ref().is_some_and(|m| m.get_field(Tag::Make, In::PRIMARY).unwrap().display_value().to_string().contains("Canon"))

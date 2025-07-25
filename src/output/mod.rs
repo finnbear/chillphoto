@@ -110,7 +110,7 @@ impl Gallery {
 
                     // Hashing this is expensive so do it once for image, preview, and thumbnail.
                     let input_image_data_hash = Arc::new(LazyLock::new(|| {
-                        checksum(&photo.input_image_data)
+                        photo.input_image_data_checksum()
                     }));
 
                     let hash_factory  = |key: &'static str| -> DynLazy<'a, String> {
@@ -124,7 +124,7 @@ impl Gallery {
                                 self.config,
                                 photo.config,
                                 photo.distinct_name,
-                                photo.exif,
+                                photo.exif(),
                                 photo.file_date,
                                 photo.name,
                                 photo.output_name(),
@@ -140,7 +140,7 @@ impl Gallery {
                     ret_insert(&mut ret,
                         photo_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.image(&self.config), &photo_path, xmp)
+                            write_image(&photo.image(&self.config), &photo_path, xmp)
                         })),
                         Some(hash_factory("image")),
                     );
@@ -148,7 +148,7 @@ impl Gallery {
                     ret_insert(&mut ret,
                         preview_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.preview(&self.config), &preview_path, xmp)
+                            write_image(&photo.preview(&self.config), &preview_path, xmp)
                         })),
                         Some(hash_factory("preview")),
                     );
@@ -156,7 +156,7 @@ impl Gallery {
                     ret_insert(&mut ret,
                         thumbnail_path.clone(),
                         LazyLock::new(Box::new(move || {
-                            write_image(photo.thumbnail(&self.config), &thumbnail_path, xmp)
+                            write_image(&photo.thumbnail(&self.config), &thumbnail_path, xmp)
                         })),
                         Some(hash_factory("thumbnail")),
                     );
@@ -247,34 +247,34 @@ impl Gallery {
                                                 {self.config.format_date(date_time.date())}
                                             </time>
                                         }
-                                        if photo.exif.focal_length.is_some() || photo.exif.aperture.is_some() {
+                                        if photo.exif().focal_length.is_some() || photo.exif().aperture.is_some() {
                                             <div
-                                                title={photo.exif.lens_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
+                                                title={photo.exif().lens_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
                                                 class={"sidebar_details_panel_text"}
                                             >
-                                                if let Some(focal_length) = &photo.exif.focal_length {
+                                                if let Some(focal_length) = &photo.exif().focal_length {
                                                     {focal_length.replace(' ', "").to_owned()}
                                                 }
-                                                if photo.exif.focal_length.is_some() && photo.exif.aperture.is_some() {
+                                                if photo.exif().focal_length.is_some() && photo.exif().aperture.is_some() {
                                                     {" "}
                                                 }
-                                                if let Some(aperture) = &photo.exif.aperture {
+                                                if let Some(aperture) = &photo.exif().aperture {
                                                     {aperture.clone()}
                                                 }
                                             </div>
                                         }
-                                        if photo.exif.exposure_time.is_some() || photo.exif.iso_sensitivity.is_some() {
+                                        if photo.exif().exposure_time.is_some() || photo.exif().iso_sensitivity.is_some() {
                                             <div
-                                                title={photo.exif.camera_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
+                                                title={photo.exif().camera_model.as_ref().map(|s| s.trim_matches('"').to_owned())}
                                                 class={"sidebar_details_panel_text"}
                                             >
-                                                if let Some(exposure_time) = &photo.exif.exposure_time {
+                                                if let Some(exposure_time) = &photo.exif().exposure_time {
                                                     {exposure_time.replace(' ', "").to_owned()}
                                                 }
-                                                if photo.exif.exposure_time.is_some() && photo.exif.iso_sensitivity.is_some() {
+                                                if photo.exif().exposure_time.is_some() && photo.exif().iso_sensitivity.is_some() {
                                                     {" "}
                                                 }
-                                                if let Some(iso_sensitivity) = &photo.exif.iso_sensitivity {
+                                                if let Some(iso_sensitivity) = &photo.exif().iso_sensitivity {
                                                     {format!("ISO{}", iso_sensitivity)}
                                                 }
                                             </div>
@@ -713,10 +713,11 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&GalleryConfig, &Pho
     let format = ImageFormat::from_path(path).unwrap();
     img.write_to(&mut ret, format).unwrap();
     let mut buf = ret.into_inner();
-    if let Some((config, photo)) = xmp {
+    if let Some((config, photo)) = xmp.filter(|_| !matches!(format, ImageFormat::WebP)) {
         // Awaiting https://github.com/adobe/xmp-toolkit-rs/issues/265
+        let ext = format.extensions_str()[0];
         let file = tempfile::Builder::new()
-            .suffix(&format!(".xmp.{}", format.extensions_str()[0]))
+            .suffix(&format!(".xmp.{}", ext))
             .tempfile()
             .unwrap();
         let path = file.path();
@@ -730,7 +731,7 @@ pub fn write_image(img: &RgbImage, path: &str, xmp: Option<(&GalleryConfig, &Pho
                     .only_xmp()
                     .use_smart_handler(),
             )
-            .unwrap();
+            .expect(ext);
         let mut xmp = XmpMeta::new().unwrap();
 
         static ONCE: std::sync::Once = std::sync::Once::new();

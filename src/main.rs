@@ -3,7 +3,6 @@ use crate::image_ai::init_image_ai;
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use gallery::CategoryPath;
-use gallery::ExifData;
 use gallery::Photo;
 use gallery::StaticFile;
 use gallery::{CategoryConfig, GalleryConfig, PageConfig, PhotoConfig};
@@ -77,6 +76,11 @@ enum Command {
         /// upload limit.
         #[arg(long, default_value_t = 750)]
         limit: usize,
+        /// Resize photos to this resolution on the long side. This
+        /// is useful for staying under the Copyright Office's limits,
+        /// such as a 500MB upload limit.
+        #[arg(long, default_value_t = 600)]
+        resolution: u32,
     },
     /// Serve gallery preview.
     Serve {
@@ -249,24 +253,20 @@ fn main() {
         }
 
         let metadata = fs::metadata(entry.path()).unwrap();
-        let input_image_data = fs::read(entry.path()).unwrap();
 
         let mut gallery = gallery.lock().unwrap();
         if categories.is_root() && name_no_extension == "favicon" {
-            gallery.gallery.favicon = Some((input_image_data, OnceLock::new()));
+            gallery.gallery.favicon = Some((fs::read(entry.path()).unwrap(), OnceLock::new()));
             return;
         }
 
         let photo = Photo {
             name: name_no_extension,
             text: None,
-            exif: ExifData::load(&input_image_data),
-            input_image_data,
-            image: Default::default(),
-            preview: Default::default(),
-            thumbnail: Default::default(),
+            exif: Default::default(),
             config: Default::default(),
             file_date: metadata.modified().or(metadata.created()).ok(),
+            path: entry.path().to_owned(),
             src_key: path_no_extension,
             parsed_config_date: None,
             distinct_name: None,
@@ -447,9 +447,17 @@ fn main() {
         case_number,
         start,
         limit,
+        resolution,
     } = &args.command
     {
-        gallery.copyright(*year, author, case_number, start.as_deref(), *limit);
+        gallery.copyright(
+            *year,
+            author,
+            case_number,
+            start.as_deref(),
+            *limit,
+            *resolution,
+        );
         return;
     }
 
